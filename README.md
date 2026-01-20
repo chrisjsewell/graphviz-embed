@@ -292,6 +292,7 @@ When cross-compiling (e.g., building Linux ARM64 from x86_64):
 3. **No incremental layout**: Each render call creates a new graph; no persistent graph editing
 4. **Single-threaded rendering**: Operations are serialized via mutex for safety
 5. **Shared global context**: All `GraphvizContext` instances share the same underlying C context. This is intentional — the Graphviz C library has issues with repeated context creation/destruction on some platforms (notably macOS Intel). This has no impact on functionality; creating multiple `GraphvizContext` instances is safe and has negligible overhead.
+6. **Linux release mode tests**: Due to a limitation with the rust-lld linker not properly handling Graphviz's complex static library dependencies, Linux tests must be run in debug mode (`cargo test`). Release builds work fine for applications; only `cargo test --release` is affected.
 
 ## Future Improvements
 
