@@ -778,12 +778,12 @@ fn handle_cairo_feature(target_os: &str) {
     println!("cargo:rustc-link-lib=cairo");
     println!("cargo:rustc-link-lib=pango-1.0");
     println!("cargo:rustc-link-lib=pangocairo-1.0");
-    
+
     // On Linux, we need pangoft2 for Fontconfig-based font support
     // macOS uses CoreText backend which doesn't need this
     if target_os == "linux" {
         println!("cargo:rustc-link-lib=pangoft2-1.0");
     }
-    
+
     println!("cargo:rustc-link-lib=gvplugin_pango");
 }
