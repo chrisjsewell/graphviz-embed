@@ -1,0 +1,27 @@
+[package]
+name = "graphviz-sys"
+description = "Low-level FFI bindings to Graphviz with vendored C source"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords = ["graphviz", "ffi", "bindings", "sys"]
+categories = ["external-ffi-bindings", "graphics"]
+build = "build.rs"
+links = "graphviz"
+
+[features]
+default = []
+# Enable Cairo/Pango for PNG, PDF, and other raster output formats
+cairo = []
+
+[build-dependencies]
+cmake = "0.1"
+cc = { version = "1.0", features = ["parallel"] }
+pkg-config = "0.3"
+
+[target.'cfg(windows)'.build-dependencies]
+vcpkg = "0.2"
+
+[dependencies]
+libc = "0.2"

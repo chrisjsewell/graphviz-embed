@@ -1,0 +1,22 @@
+[package]
+name = "graphviz-embed"
+description = "Embedded Graphviz library for Rust - render DOT graphs without external dependencies"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "../README.md"
+
+[features]
+default = []
+# Enable Cairo/Pango for PNG, PDF, and other raster output formats
+cairo = ["graphviz-sys/cairo"]
+
+[dependencies]
+graphviz-sys.workspace = true
+thiserror.workspace = true
+libc = "0.2"
+
+[dev-dependencies]

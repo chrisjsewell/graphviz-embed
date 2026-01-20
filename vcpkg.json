@@ -1,0 +1,13 @@
+{
+  "name": "graphviz-embed",
+  "version": "0.1.0",
+  "dependencies": [
+    {
+      "name": "cairo",
+      "features": ["fontconfig"]
+    },
+    {
+      "name": "pango"
+    }
+  ]
+}

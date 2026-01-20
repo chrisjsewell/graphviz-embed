@@ -1,0 +1,75 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: graphviz-embed <graphviz-embed@example.com>
+Date: Mon, 1 Jan 2024 00:00:00 +0000
+Subject: [PATCH] Use pre-generated Bison/Flex parser files
+
+This patch modifies the CMake configuration to use pre-generated
+parser files instead of invoking Bison and Flex at build time.
+This removes the build-time dependency on these tools.
+
+---
+ lib/cgraph/CMakeLists.txt | 20 ++++++--------------
+ lib/common/CMakeLists.txt | 10 +++-------
+ lib/expr/CMakeLists.txt   | 14 +++++---------
+ 3 files changed, 14 insertions(+), 30 deletions(-)
+
+diff --git a/lib/cgraph/CMakeLists.txt b/lib/cgraph/CMakeLists.txt
+index 1234567..abcdefg 100644
+--- a/lib/cgraph/CMakeLists.txt
++++ b/lib/cgraph/CMakeLists.txt
+@@ -1,14 +1,12 @@
+-BISON_TARGET(Grammar ${CMAKE_CURRENT_SOURCE_DIR}/grammar.y
+-                     ${CMAKE_CURRENT_BINARY_DIR}/grammar.c)
+-FLEX_TARGET(Scan
+-  ${CMAKE_CURRENT_SOURCE_DIR}/scan.l
+-  ${CMAKE_CURRENT_BINARY_DIR}/scan.c
+-  COMPILE_FLAGS --case-insensitive
+-)
+-ADD_FLEX_BISON_DEPENDENCY(Scan Grammar)
++# Use pre-generated parser files (no Bison/Flex required at build time)
++set(BISON_Grammar_OUTPUTS
++  ${CMAKE_CURRENT_SOURCE_DIR}/grammar.c
++  ${CMAKE_CURRENT_SOURCE_DIR}/grammar.h
++)
++set(FLEX_Scan_OUTPUTS
++  ${CMAKE_CURRENT_SOURCE_DIR}/scan.c
++)
+ 
+ add_definitions(-DEXPORT_CGRAPH -DEXPORT_CGHDR)
+ if(WIN32 AND NOT MINGW)
+
+diff --git a/lib/common/CMakeLists.txt b/lib/common/CMakeLists.txt
+index 1234567..abcdefg 100644
+--- a/lib/common/CMakeLists.txt
++++ b/lib/common/CMakeLists.txt
+@@ -1,5 +1,7 @@
+-BISON_TARGET(HTMLparse ${CMAKE_CURRENT_SOURCE_DIR}/htmlparse.y
+-                       ${CMAKE_CURRENT_BINARY_DIR}/htmlparse.c)
++# Use pre-generated parser files (no Bison required at build time)
++set(BISON_HTMLparse_OUTPUTS
++  ${CMAKE_CURRENT_SOURCE_DIR}/htmlparse.c
++)
+ 
+ add_definitions(-DGVC_EXPORTS)
+
+diff --git a/lib/expr/CMakeLists.txt b/lib/expr/CMakeLists.txt
+index 1234567..abcdefg 100644
+--- a/lib/expr/CMakeLists.txt
++++ b/lib/expr/CMakeLists.txt
+@@ -1,9 +1,9 @@
+-BISON_TARGET(
+-  Exparse
+-  ${CMAKE_CURRENT_SOURCE_DIR}/exparse.y
+-  ${CMAKE_CURRENT_BINARY_DIR}/exparse.c
+-  COMPILE_FLAGS "--yacc -Wno-yacc --defines --debug --verbose"
+-)
++# Use pre-generated parser files (no Bison required at build time)
++set(BISON_Exparse_OUTPUTS
++  ${CMAKE_CURRENT_SOURCE_DIR}/exparse.c
++  ${CMAKE_CURRENT_SOURCE_DIR}/exparse.h
++)
+ 
+ add_library(expr STATIC
+   # Header files
+--
+2.40.0

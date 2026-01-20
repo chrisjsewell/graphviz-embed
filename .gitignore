@@ -1,0 +1,29 @@
+# Build artifacts
+/target/
+**/target/
+
+# Cargo lock file for library crate
+# Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# CMake build directories (shouldn't be in repo anyway)
+build/
+cmake-build-*/
+
+# Generated files during build (not the pre-generated ones)
+*.o
+*.a
+*.lib
+*.dll
+*.so
+*.dylib
