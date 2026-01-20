@@ -12,5 +12,6 @@ pre-build = [
     apt-get update && \
     apt-get install -y python3.9 && \
     ln -sf /usr/bin/python3.9 /usr/bin/python3
+    ln -sf /usr/bin/python3.9 /usr/bin/python3.5
     """
 ]
