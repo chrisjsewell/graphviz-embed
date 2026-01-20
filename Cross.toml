@@ -1,7 +1,7 @@
 # This is a Cross.toml configuration file for cross-compiling Rust projects.
 
-# we need the latest, rather than the default stable, to use ubuntu 20.04 instead of 16.04
-# (stable was released 3 years ago and is quite out of date)
+# we need the edge version, rather than the latest, to use ubuntu 20.04 instead of 16.04
+# (latest was released 3 years ago and is quite out of date)
 
 # We also need to install Python 3.6+ on the aarch64-unknown-linux-gnu target before building,
 # since the default cross-rs image does not include it, and some build scripts require Python.
