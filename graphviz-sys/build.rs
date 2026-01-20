@@ -437,6 +437,11 @@ fn build_expat(
         .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
         .out_dir(out_dir.join("expat-build"));
 
+    // On Windows MSVC, use static CRT to match Graphviz build
+    if target.contains("msvc") {
+        config.define("EXPAT_MSVC_STATIC_CRT", "ON");
+    }
+
     configure_cmake_for_target(&mut config, target, target_os, target_arch, host);
 
     config.build()
@@ -460,7 +465,7 @@ fn build_graphviz(
         // Disable CLI tools - we only want the library
         .define("GRAPHVIZ_CLI", "OFF")
         // Disable plugin loading - we'll statically link plugins
-        .define("enable_ltdl", "OFF")
+        .define("ENABLE_LTDL", "OFF")
         // Point to our built expat
         .define("WITH_EXPAT", "ON")
         .define(
@@ -469,15 +474,26 @@ fn build_graphviz(
         )
         .define("EXPAT_LIBRARY", find_expat_lib(expat_install, target_os))
         // Disable optional features we don't need
-        .define("with_gvedit", "OFF")
-        .define("with_smyrna", "OFF")
-        .define("enable_tcl", "OFF")
-        .define("enable_swig", "OFF")
+        .define("WITH_GVEDIT", "OFF")
+        .define("WITH_SMYRNA", "OFF")
         .define("WITH_ZLIB", "OFF")
         // Disable features that require C++ (avoiding C++ stdlib issues)
         .define("with_ipsepcola", "OFF")
-        // Disable GTS (GNU Triangulated Surface) - requires glib
-        .define("WITH_GTS", "OFF")
+        // Disable all SWIG language bindings
+        .define("ENABLE_TCL", "OFF")
+        .define("ENABLE_SWIG", "OFF")
+        .define("ENABLE_SHARP", "OFF")
+        .define("ENABLE_D", "OFF")
+        .define("ENABLE_GO", "OFF")
+        .define("ENABLE_GUILE", "OFF")
+        .define("ENABLE_JAVA", "OFF")
+        .define("ENABLE_JAVASCRIPT", "OFF")
+        .define("ENABLE_LUA", "OFF")
+        .define("ENABLE_PERL", "OFF")
+        .define("ENABLE_PHP", "OFF")
+        .define("ENABLE_PYTHON", "OFF")
+        .define("ENABLE_R", "OFF")
+        .define("ENABLE_RUBY", "OFF")
         .out_dir(out_dir.join("graphviz-build"));
 
     // Cairo/Pango handling
@@ -488,9 +504,13 @@ fn build_graphviz(
 
     #[cfg(not(feature = "cairo"))]
     {
-        config.define("with_gdk", "OFF");
-        config.define("with_rsvg", "OFF");
-        config.define("with_pangocairo", "OFF");
+        // Use CMAKE_DISABLE_FIND_PACKAGE_* to prevent CMake from finding these
+        // (standard CMake mechanism to skip find_package() calls)
+        config.define("CMAKE_DISABLE_FIND_PACKAGE_PANGOCAIRO", "TRUE");
+        config.define("CMAKE_DISABLE_FIND_PACKAGE_CAIRO", "TRUE");
+        config.define("CMAKE_DISABLE_FIND_PACKAGE_GD", "TRUE");
+        config.define("WITH_GDK", "OFF");
+        config.define("WITH_RSVG", "OFF");
     }
 
     configure_cmake_for_target(&mut config, target, target_os, target_arch, host);
@@ -535,8 +555,9 @@ fn configure_cmake_for_target(
 fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
     let lib_dir = expat_install.join("lib");
 
+    // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON, the library is named libexpatMT.lib
     let lib_name = match target_os {
-        "windows" => "expat.lib",
+        "windows" => "libexpatMT.lib",
         _ => "libexpat.a",
     };
 
@@ -689,7 +710,11 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // Link Graphviz libraries
     // List libraries in reverse dependency order (dependencies last)
 
-    println!("cargo:rustc-link-lib=static=expat");
+    // Expat library name differs on Windows with static CRT
+    match target_os {
+        "windows" => println!("cargo:rustc-link-lib=static=expatMT"),
+        _ => println!("cargo:rustc-link-lib=static=expat"),
+    }
     println!("cargo:rustc-link-lib=static=util");
     println!("cargo:rustc-link-lib=static=ast");
     println!("cargo:rustc-link-lib=static=sfio");
