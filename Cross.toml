@@ -7,7 +7,7 @@
 # since the default cross-rs image does not include it, and some build scripts require Python.
 [target.aarch64-unknown-linux-gnu]
 # see https://github.com/cross-rs/cross/blob/main/docker/Dockerfile.aarch64-unknown-linux-gnu
-image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:latest"
+image = "ghcr.io/cross-rs/aarch64-unknown-linux-gnu:edge"
 pre-build = [
     """
     apt-get update && apt-get install -y wget xz-utils && \
