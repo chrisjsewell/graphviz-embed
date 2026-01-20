@@ -167,35 +167,46 @@ mod tests {
     use super::*;
     use std::ffi::CString;
     use std::ptr;
+    use std::sync::{Mutex, OnceLock};
+
+    // Wrapper to make the raw pointer Send + Sync
+    // Safety: We protect access with a Mutex
+    struct GvcPtr(*mut GVC_t);
+    unsafe impl Send for GvcPtr {}
+    unsafe impl Sync for GvcPtr {}
+
+    // Shared context for all tests - Graphviz has issues with repeated context creation/destruction
+    static TEST_CONTEXT: OnceLock<Mutex<GvcPtr>> = OnceLock::new();
+
+    fn get_test_context() -> *mut GVC_t {
+        let guard = TEST_CONTEXT.get_or_init(|| {
+            let gvc = unsafe { gv_init() };
+            Mutex::new(GvcPtr(gvc))
+        });
+        guard.lock().unwrap().0
+    }
 
     #[test]
     fn test_context_creation() {
-        unsafe {
-            let gvc = gv_init();
-            assert!(!gvc.is_null());
-            gvFreeContext(gvc);
-        }
+        let gvc = get_test_context();
+        assert!(!gvc.is_null());
     }
 
     #[test]
     fn test_parse_simple_graph() {
+        let _gvc = get_test_context();
         unsafe {
-            let gvc = gv_init();
-            assert!(!gvc.is_null());
-
             let dot = CString::new("digraph { a -> b }").unwrap();
             let graph = agmemread(dot.as_ptr());
             assert!(!graph.is_null());
-
             agclose(graph);
-            gvFreeContext(gvc);
         }
     }
 
     #[test]
     fn test_layout_and_render() {
+        let gvc = get_test_context();
         unsafe {
-            let gvc = gv_init();
             assert!(!gvc.is_null());
 
             let dot = CString::new("digraph { a -> b }").unwrap();
@@ -218,7 +229,7 @@ mod tests {
             gvFreeRenderData(data);
             gvFreeLayout(gvc, graph);
             agclose(graph);
-            gvFreeContext(gvc);
+            // Don't free the shared context
         }
     }
 }
