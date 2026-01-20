@@ -711,8 +711,10 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // List libraries in reverse dependency order (dependencies last)
 
     // Expat library name differs on Windows with static CRT
+    // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON, the library is named libexpatMT.lib
+    // We use the :+verbatim modifier to specify the exact filename
     match target_os {
-        "windows" => println!("cargo:rustc-link-lib=static=expatMT"),
+        "windows" => println!("cargo:rustc-link-lib=static:+verbatim=libexpatMT.lib"),
         _ => println!("cargo:rustc-link-lib=static=expat"),
     }
     println!("cargo:rustc-link-lib=static=util");
