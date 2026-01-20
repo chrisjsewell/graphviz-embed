@@ -7,7 +7,7 @@ working with the graphviz-embed codebase.
 
 **graphviz-embed** is a Rust crate that embeds the Graphviz C library to render DOT
 graphs without requiring external tool installation. It vendors Graphviz 14.1.1 and
-Expat 2.7.3 source code and compiles them as part of the Rust build process.
+Expat 2.7.1 source code and compiles them as part of the Rust build process.
 
 ## Crate Structure
 
@@ -27,7 +27,7 @@ graphviz-embed/
 │   └── src/lib.rs              # Raw FFI declarations
 ├── vendor/
 │   ├── graphviz/               # Git submodule @ tag 14.1.1
-│   └── expat/                  # Git submodule @ tag R_2_7_3
+│   └── expat/                  # Git submodule @ tag R_2_7_1
 ├── generated/                  # Pre-generated Bison/Flex outputs
 │   ├── cgraph/                 # DOT parser: grammar.c, grammar.h, scan.c
 │   ├── common/                 # HTML parser: htmlparse.c, htmlparse.h

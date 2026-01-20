@@ -349,6 +349,101 @@ With Cairo:
 cargo test --features cairo
 ```
 
+## Updating Vendored Dependencies
+
+This crate vendors specific versions of Graphviz and Expat. If you need to update to a newer version, follow these steps:
+
+### Updating Graphviz
+
+1. **Update the git submodule to the desired version:**
+   ```bash
+   cd vendor/graphviz
+   git fetch
+   git checkout <new-tag>  # e.g., 14.2.0
+   cd ../..
+   ```
+
+2. **Regenerate parser files** (requires Bison ≥3.0 and Flex):
+   ```bash
+   cd vendor/graphviz
+   
+   # cgraph parser (DOT syntax)
+   cd lib/cgraph
+   bison -d -o grammar.c grammar.y
+   flex --case-insensitive -o scan.c scan.l
+   cp grammar.c grammar.h scan.c ../../../generated/cgraph/
+   
+   # HTML parser
+   cd ../common
+   bison -d -o htmlparse.c htmlparse.y
+   cp htmlparse.c htmlparse.h ../../../generated/common/
+   
+   # Expression parser
+   cd ../expr
+   bison --yacc -Wno-yacc --defines --debug --verbose -o exparse.c exparse.y
+   cp exparse.c exparse.h ../../../generated/expr/
+   
+   cd ../../..
+   ```
+
+3. **Update CMake patches if needed:**
+   - If Graphviz's `CMakeLists.txt` files have changed significantly, you may need to regenerate the patch in `patches/0001-use-pregenerated-parsers.patch`
+   - See the existing patch for reference on what modifications are needed (disabling Bison/Flex requirements, using pre-generated files)
+
+4. **Update version references in documentation:**
+   - Update the version in `generated/README.md`
+   - Update the version mentioned in `AGENTS.md` if applicable
+   - Update this section in `README.md`
+
+5. **Test thoroughly:**
+   ```bash
+   cargo clean
+   cargo test
+   cargo test --features cairo
+   ```
+
+6. **Commit the changes:**
+   ```bash
+   git add vendor/graphviz generated/
+   git commit -m "Update Graphviz to version <new-version>"
+   ```
+
+### Updating Expat
+
+1. **Update the git submodule to the desired version:**
+   ```bash
+   cd vendor/expat
+   git fetch
+   git checkout <new-tag>  # e.g., R_2_8_0
+   cd ../..
+   ```
+
+2. **Test the build on all platforms:**
+   ```bash
+   cargo clean
+   cargo test
+   cargo test --features cairo
+   ```
+
+3. **Update version references in documentation:**
+   - Update the version in `generated/README.md`
+   - Update the version mentioned in `AGENTS.md` if applicable
+
+4. **Commit the changes:**
+   ```bash
+   git add vendor/expat
+   git commit -m "Update Expat to version <new-version>"
+   ```
+
+### Important Notes
+
+- **Parser Generation**: Bison and Flex are only needed for regenerating parser files when updating Graphviz. Regular users building the crate do not need these tools.
+- **Submodule Pinning**: The git submodules pin specific commits. Always verify you're on the correct tag after updating.
+- **Platform Testing**: Graphviz is a complex C library. Test on multiple platforms (Linux, macOS, Windows) after updates.
+- **CMake Changes**: If the Graphviz build system changes significantly, you may need to update `graphviz-sys/build.rs` to handle new libraries or dependencies.
+
+For more detailed technical information about the build system and internal architecture, see [AGENTS.md](AGENTS.md).
+
 ## License
 
 This project is licensed under either of:

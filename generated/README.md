@@ -60,3 +60,10 @@ These files were generated from Graphviz version: **14.1.1**
 Expat version: **2.7.1**
 
 Last regenerated: 2026-01-20
+
+## Notes
+
+When updating the vendored Graphviz or Expat versions, remember to:
+1. Update these version numbers above
+2. Regenerate the parser files using the commands in this README
+3. Update version references in the main README.md and AGENTS.md
