@@ -686,8 +686,8 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
         expat_install.display()
     );
 
-    // Link Graphviz libraries in dependency order
-    // Use standard cargo link directives that work across platforms
+    // Link Graphviz libraries
+    // List libraries in reverse dependency order (dependencies last)
     
     println!("cargo:rustc-link-lib=static=expat");
     println!("cargo:rustc-link-lib=static=util");

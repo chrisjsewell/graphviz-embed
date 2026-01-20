@@ -1,7 +1,7 @@
-# Use system linker (gcc/ld) instead of rust-lld on Linux
+# Use system linker instead of rust-lld on Linux
 # This fixes static library linking issues in release mode
 [target.x86_64-unknown-linux-gnu]
-linker = "gcc"
+linker = "cc"
 
 [target.aarch64-unknown-linux-gnu]
-linker = "gcc"
+linker = "cc"
