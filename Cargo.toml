@@ -16,3 +16,8 @@ categories = ["graphics", "visualization", "rendering"]
 [workspace.dependencies]
 graphviz-sys = { path = "graphviz-sys" }
 thiserror = "1.0"
+
+# Disable LTO in release mode to avoid linking issues with static C libraries
+[profile.release]
+lto = false
+
