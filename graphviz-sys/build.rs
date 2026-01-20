@@ -496,6 +496,12 @@ fn build_graphviz(
         .define("ENABLE_RUBY", "OFF")
         .out_dir(out_dir.join("graphviz-build"));
 
+    // On Windows, tell Graphviz that Expat is statically linked (not a DLL)
+    // This prevents __imp_XML_* symbol references
+    if target_os == "windows" {
+        config.define("CMAKE_C_FLAGS", "/DXML_STATIC");
+    }
+
     // Cairo/Pango handling
     #[cfg(feature = "cairo")]
     {
@@ -623,6 +629,12 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     emit_link_search(&build_dir, "lib/ast", target_os);
     emit_link_search(&build_dir, "lib/expr", target_os);
     emit_link_search(&build_dir, "lib/util", target_os);
+    // Core libraries
+    emit_link_search(&build_dir, "lib/cgraph", target_os);
+    emit_link_search(&build_dir, "lib/cdt", target_os);
+    emit_link_search(&build_dir, "lib/gvc", target_os);
+    emit_link_search(&build_dir, "lib/pathplan", target_os);
+    emit_link_search(&build_dir, "lib/xdot", target_os);
 
     // Expat directories
     emit_link_search(expat_install, "lib", target_os);
