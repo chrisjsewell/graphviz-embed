@@ -211,7 +211,7 @@ mod tests {
     #[cfg_attr(all(target_os = "macos", target_arch = "x86_64"), ignore)]
     fn test_layout_and_render() {
         use std::ptr;
-        
+
         let gvc = get_test_context();
         unsafe {
             assert!(!gvc.is_null());

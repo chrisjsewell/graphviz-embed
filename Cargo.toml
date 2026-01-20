@@ -16,3 +16,4 @@ categories = ["graphics", "visualization", "rendering"]
 [workspace.dependencies]
 graphviz-sys = { path = "graphviz-sys" }
 thiserror = "1.0"
+

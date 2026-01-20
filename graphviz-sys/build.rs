@@ -686,13 +686,24 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
         expat_install.display()
     );
 
-    // Link Graphviz libraries in dependency order
-    // Plugins first (they depend on core libraries)
-    println!("cargo:rustc-link-lib=static=gvplugin_dot_layout");
-    println!("cargo:rustc-link-lib=static=gvplugin_neato_layout");
-    println!("cargo:rustc-link-lib=static=gvplugin_core");
+    // Link Graphviz libraries
+    // List libraries in reverse dependency order (dependencies last)
 
-    // Internal layout libraries (needed by plugins)
+    println!("cargo:rustc-link-lib=static=expat");
+    println!("cargo:rustc-link-lib=static=util");
+    println!("cargo:rustc-link-lib=static=ast");
+    println!("cargo:rustc-link-lib=static=sfio");
+    println!("cargo:rustc-link-lib=static=cdt");
+    println!("cargo:rustc-link-lib=static=cgraph");
+    println!("cargo:rustc-link-lib=static=pathplan");
+    println!("cargo:rustc-link-lib=static=xdot");
+    println!("cargo:rustc-link-lib=static=common");
+    println!("cargo:rustc-link-lib=static=label");
+    println!("cargo:rustc-link-lib=static=pack");
+    println!("cargo:rustc-link-lib=static=ortho");
+    println!("cargo:rustc-link-lib=static=rbtree");
+    println!("cargo:rustc-link-lib=static=sparse");
+    println!("cargo:rustc-link-lib=static=expr");
     println!("cargo:rustc-link-lib=static=dotgen");
     println!("cargo:rustc-link-lib=static=neatogen");
     println!("cargo:rustc-link-lib=static=fdpgen");
@@ -701,28 +712,10 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     println!("cargo:rustc-link-lib=static=patchwork");
     println!("cargo:rustc-link-lib=static=circogen");
     println!("cargo:rustc-link-lib=static=osage");
-    println!("cargo:rustc-link-lib=static=sparse");
-    println!("cargo:rustc-link-lib=static=rbtree");
-    println!("cargo:rustc-link-lib=static=ortho");
-    println!("cargo:rustc-link-lib=static=pack");
-    println!("cargo:rustc-link-lib=static=label");
-    println!("cargo:rustc-link-lib=static=common");
-
-    // Core libraries
     println!("cargo:rustc-link-lib=static=gvc");
-    println!("cargo:rustc-link-lib=static=cgraph");
-    println!("cargo:rustc-link-lib=static=cdt");
-    println!("cargo:rustc-link-lib=static=pathplan");
-    println!("cargo:rustc-link-lib=static=xdot");
-
-    // Expression library (for gvpr)
-    println!("cargo:rustc-link-lib=static=expr");
-    println!("cargo:rustc-link-lib=static=sfio");
-    println!("cargo:rustc-link-lib=static=ast");
-    println!("cargo:rustc-link-lib=static=util");
-
-    // Expat for HTML labels
-    println!("cargo:rustc-link-lib=static=expat");
+    println!("cargo:rustc-link-lib=static=gvplugin_core");
+    println!("cargo:rustc-link-lib=static=gvplugin_dot_layout");
+    println!("cargo:rustc-link-lib=static=gvplugin_neato_layout");
 
     // Platform-specific system libraries
     match target_os {
