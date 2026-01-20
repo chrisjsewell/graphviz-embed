@@ -260,7 +260,36 @@ The `graphviz-sys` crate contains unsafe code for FFI:
 5. Always call `agclose()` on graphs
 6. Always call `gvFreeContext()` on context
 
-## CI/CD
+## Commit and PR Message Format
+
+Use this format:
+
+```
+<EMOJI> <KEYWORD>: Summarize in 72 chars or less (#<PR>)
+
+Optional detailed explanation.
+```
+
+Keywords:
+
+- `✨ NEW:` – New feature
+- `🐛 FIX:` – Bug fix
+- `👌 IMPROVE:` – Improvement (no breaking changes)
+- `‼️ BREAKING:` – Breaking change
+- `📚 DOCS:` – Documentation
+- `🔧 MAINTAIN:` – Maintenance changes only (typos, etc.)
+- `🧪 TEST:` – Tests or CI changes only
+- `♻️ REFACTOR:` – Refactoring
+
+If the commit only makes changes to a single package,
+consider including the name in the title.
+
+## PR title and description format
+
+All PR titles MUST start with an emoji.
+Use the same format as for the commit messages above, although you can omit the `KEYWORD` in the title.
+
+## CI Checks
 
 GitHub Actions runs on every push/PR:
 
@@ -268,9 +297,13 @@ GitHub Actions runs on every push/PR:
 - Tests with and without `cairo` feature
 - Cairo deps installed on runners
 
+Before pushing commits or opening PRs, ensure `cargo fmt` and `cargo clippy` pass locally!
+
 ## Contact
 
 For questions about the codebase:
-1. Check existing issues on GitHub
-2. Read the inline code comments
-3. Consult Graphviz documentation: https://graphviz.org/documentation/
+
+1. Read the README.md
+2. Check existing issues on GitHub
+3. Read the inline code comments
+4. Consult Graphviz documentation: https://graphviz.org/documentation/
