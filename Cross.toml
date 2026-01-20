@@ -1,0 +1,6 @@
+# This is a Cross.toml configuration file for cross-compiling Rust projects.
+# we need to install python3 on the aarch64-unknown-linux-gnu target before building,
+# since it is not included by default on the ghcr.io/cross-rs/aarch64-unknown-linux-gnu image,
+# and some build scripts depend on it.
+[target.aarch64-unknown-linux-gnu]
+pre-build = ["apt-get update && apt-get install -y python3"]
