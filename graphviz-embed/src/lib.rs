@@ -64,7 +64,6 @@
 
 use std::ffi::{CStr, CString};
 use std::ptr;
-use std::sync::Once;
 
 use graphviz_sys as sys;
 use thiserror::Error;
@@ -222,12 +221,29 @@ impl std::fmt::Display for Format {
     }
 }
 
-// Global initialization for Graphviz
-static INIT: Once = Once::new();
-static mut INIT_RESULT: bool = false;
-
 // Global mutex to serialize Graphviz operations (the C library has global state)
 static GRAPHVIZ_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+// Global shared context - Graphviz has issues with repeated context creation/destruction
+// on some platforms (notably macOS Intel), so we use a single shared context that's never freed.
+// This is safe because all operations are serialized via GRAPHVIZ_MUTEX.
+struct GvcPtr(*mut sys::GVC_t);
+unsafe impl Send for GvcPtr {}
+unsafe impl Sync for GvcPtr {}
+
+static GLOBAL_CONTEXT: std::sync::OnceLock<GvcPtr> = std::sync::OnceLock::new();
+
+fn get_global_context() -> Result<*mut sys::GVC_t> {
+    let ctx = GLOBAL_CONTEXT.get_or_init(|| {
+        let gvc = unsafe { sys::gv_init() };
+        GvcPtr(gvc)
+    });
+    if ctx.0.is_null() {
+        Err(Error::InitFailed)
+    } else {
+        Ok(ctx.0)
+    }
+}
 
 /// Graphviz rendering context
 ///
@@ -239,7 +255,15 @@ static GRAPHVIZ_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 ///
 /// `GraphvizContext` is both `Send` and `Sync`. The underlying Graphviz library
 /// has global state, so all operations are serialized internally using a mutex.
+///
+/// # Note
+///
+/// Internally, all `GraphvizContext` instances share the same underlying Graphviz
+/// context. This is because the Graphviz C library has global state and issues with
+/// repeated context creation/destruction on some platforms. Creating multiple
+/// `GraphvizContext` instances is safe and has negligible overhead.
 pub struct GraphvizContext {
+    // We store a copy of the pointer, but all instances share the same global context
     gvc: *mut sys::GVC_t,
 }
 
@@ -251,33 +275,15 @@ unsafe impl Sync for GraphvizContext {}
 impl GraphvizContext {
     /// Create a new Graphviz context
     ///
-    /// This initializes the Graphviz library and registers all available
-    /// layout engines and output formats.
+    /// This initializes the Graphviz library (on first call) and returns a handle
+    /// to the shared rendering context.
     ///
     /// # Errors
     ///
     /// Returns an error if Graphviz initialization fails.
     pub fn new() -> Result<Self> {
-        // Serialize access to Graphviz
-        let _lock = GRAPHVIZ_MUTEX.lock().unwrap();
-
-        // Initialize Graphviz library (only once globally)
-        INIT.call_once(|| unsafe {
-            INIT_RESULT = true;
-        });
-
-        unsafe {
-            if !INIT_RESULT {
-                return Err(Error::InitFailed);
-            }
-
-            let gvc = sys::gv_init();
-            if gvc.is_null() {
-                return Err(Error::InitFailed);
-            }
-
-            Ok(Self { gvc })
-        }
+        let gvc = get_global_context()?;
+        Ok(Self { gvc })
     }
 
     /// Render a DOT graph to the specified format
@@ -384,17 +390,11 @@ impl GraphvizContext {
     }
 }
 
-impl Drop for GraphvizContext {
-    fn drop(&mut self) {
-        if !self.gvc.is_null() {
-            // Serialize access to Graphviz
-            let _lock = GRAPHVIZ_MUTEX.lock().unwrap();
-            unsafe {
-                sys::gvFreeContext(self.gvc);
-            }
-        }
-    }
-}
+// Note: We intentionally don't implement Drop to free the context.
+// The global context is shared across all GraphvizContext instances and
+// is never freed. This avoids issues with Graphviz's global state on
+// platforms like macOS Intel where repeated context creation/destruction
+// can cause crashes.
 
 impl Default for GraphvizContext {
     fn default() -> Self {

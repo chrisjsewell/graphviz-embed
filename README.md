@@ -291,6 +291,7 @@ When cross-compiling (e.g., building Linux ARM64 from x86_64):
 2. **No GVPR support**: The graph pattern scanning language is not exposed in the API
 3. **No incremental layout**: Each render call creates a new graph; no persistent graph editing
 4. **Single-threaded rendering**: Operations are serialized via mutex for safety
+5. **Shared global context**: All `GraphvizContext` instances share the same underlying C context. This is intentional — the Graphviz C library has issues with repeated context creation/destruction on some platforms (notably macOS Intel). This has no impact on functionality; creating multiple `GraphvizContext` instances is safe and has negligible overhead.
 
 ## Future Improvements
 
