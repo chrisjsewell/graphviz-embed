@@ -303,6 +303,7 @@ Before pushing commits or opening PRs, ensure `cargo fmt` and `cargo clippy` pas
 
 For questions about the codebase:
 
-1. Check existing issues on GitHub
-2. Read the inline code comments
-3. Consult Graphviz documentation: https://graphviz.org/documentation/
+1. Read the README.md
+2. Check existing issues on GitHub
+3. Read the inline code comments
+4. Consult Graphviz documentation: https://graphviz.org/documentation/
