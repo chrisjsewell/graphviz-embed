@@ -1,0 +1,14 @@
+# This is a Cross.toml configuration file for cross-compiling Rust projects.
+# We need to install Python 3.6+ on the aarch64-unknown-linux-gnu target before building,
+# since the default cross-rs image is based on Ubuntu 16.04 which only has Python 3.5.
+# The Graphviz build scripts (gen_version.py) require f-strings (Python 3.6+).
+# We download a standalone Python build from python-build-standalone.
+[target.aarch64-unknown-linux-gnu]
+pre-build = [
+    """
+    apt-get update && apt-get install -y wget xz-utils && \
+    wget -qO- https://github.com/astral-sh/python-build-standalone/releases/download/20231002/cpython-3.11.6+20231002-x86_64-unknown-linux-gnu-install_only.tar.gz | tar xzf - -C /opt && \
+    ln -sf /opt/python/bin/python3 /usr/bin/python3 && \
+    ln -sf /opt/python/bin/python3 /usr/bin/python
+    """
+]
