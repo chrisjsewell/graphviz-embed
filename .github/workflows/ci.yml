@@ -97,9 +97,10 @@ jobs:
         run: cross build --release --target ${{ matrix.target }}
 
       # Test (native only - can't run cross-compiled tests)
+      # Use --test-threads=1 because Graphviz C library has global state
       - name: Test
         if: "!matrix.cross"
-        run: cargo test --release --target ${{ matrix.target }}
+        run: cargo test --release --target ${{ matrix.target }} -- --test-threads=1
 
       # Upload artifacts
       - name: Upload artifacts
@@ -181,8 +182,9 @@ jobs:
           VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
       # Test with Cairo
+      # Use --test-threads=1 because Graphviz C library has global state
       - name: Test with Cairo
-        run: cargo test --release --features cairo
+        run: cargo test --release --features cairo -- --test-threads=1
         env:
           VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
