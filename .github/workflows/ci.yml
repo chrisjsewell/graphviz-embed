@@ -99,15 +99,13 @@ jobs:
       # Test (native only - can't run cross-compiled tests)
       # Use --test-threads=1 because Graphviz C library has global state
       # Linux: Use debug mode due to rust-lld linker issues with static libraries in release mode
-      - name: Test
-        if: "!matrix.cross"
-        run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            cargo test --target ${{ matrix.target }} -- --test-threads=1
-          else
-            cargo test --release --target ${{ matrix.target }} -- --test-threads=1
-          fi
-        shell: bash
+      - name: Test (Linux - debug mode)
+        if: "!matrix.cross && runner.os == 'Linux'"
+        run: cargo test --target ${{ matrix.target }} -- --test-threads=1
+
+      - name: Test (non-Linux - release mode)
+        if: "!matrix.cross && runner.os != 'Linux'"
+        run: cargo test --release --target ${{ matrix.target }} -- --test-threads=1
 
       # Upload artifacts
       - name: Upload artifacts
@@ -191,14 +189,15 @@ jobs:
       # Test with Cairo
       # Use --test-threads=1 because Graphviz C library has global state
       # Linux: Use debug mode due to rust-lld linker issues with static libraries in release mode
-      - name: Test with Cairo
-        run: |
-          if [[ "${{ runner.os }}" == "Linux" ]]; then
-            cargo test --features cairo -- --test-threads=1
-          else
-            cargo test --release --features cairo -- --test-threads=1
-          fi
-        shell: bash
+      - name: Test with Cairo (Linux - debug mode)
+        if: runner.os == 'Linux'
+        run: cargo test --features cairo -- --test-threads=1
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
+
+      - name: Test with Cairo (non-Linux - release mode)
+        if: runner.os != 'Linux'
+        run: cargo test --release --features cairo -- --test-threads=1
         env:
           VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
