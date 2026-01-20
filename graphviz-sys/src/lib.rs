@@ -57,47 +57,50 @@ extern "C" {
     pub static gvplugin_dot_layout_LTX_library: gvplugin_library_t;
     pub static gvplugin_neato_layout_LTX_library: gvplugin_library_t;
     pub static gvplugin_core_LTX_library: gvplugin_library_t;
-    
+
     #[cfg(has_cairo)]
     pub static gvplugin_pango_LTX_library: gvplugin_library_t;
 }
 
 extern "C" {
     // GVC (Graphviz Context) functions
-    
+
     /// Create a new Graphviz context
     pub fn gvContext() -> *mut GVC_t;
-    
+
     /// Create a new Graphviz context with plugin builtins
-    pub fn gvContextPlugins(builtins: *const gvplugin_library_t, demand_loading: c_int) -> *mut GVC_t;
-    
+    pub fn gvContextPlugins(
+        builtins: *const gvplugin_library_t,
+        demand_loading: c_int,
+    ) -> *mut GVC_t;
+
     /// Free a Graphviz context
     pub fn gvFreeContext(gvc: *mut GVC_t) -> c_int;
-    
+
     /// Add a plugin library to the context
     pub fn gvAddLibrary(gvc: *mut GVC_t, lib: *const gvplugin_library_t);
-    
+
     // Graph parsing functions
-    
+
     /// Read a graph from a string
     pub fn agmemread(cp: *const c_char) -> *mut Agraph_t;
-    
+
     /// Read a graph from a file
     pub fn agread(fp: *mut FILE, disc: *mut c_void) -> *mut Agraph_t;
-    
+
     /// Close/free a graph
     pub fn agclose(g: *mut Agraph_t) -> c_int;
-    
+
     // Layout functions
-    
+
     /// Apply a layout algorithm to a graph
     pub fn gvLayout(gvc: *mut GVC_t, g: *mut Agraph_t, engine: *const c_char) -> c_int;
-    
+
     /// Free layout data
     pub fn gvFreeLayout(gvc: *mut GVC_t, g: *mut Agraph_t) -> c_int;
-    
+
     // Rendering functions
-    
+
     /// Render a graph to a file
     pub fn gvRenderFilename(
         gvc: *mut GVC_t,
@@ -105,7 +108,7 @@ extern "C" {
         format: *const c_char,
         filename: *const c_char,
     ) -> c_int;
-    
+
     /// Render a graph to memory
     pub fn gvRenderData(
         gvc: *mut GVC_t,
@@ -114,18 +117,18 @@ extern "C" {
         result: *mut *mut c_char,
         length: *mut c_uint,
     ) -> c_int;
-    
+
     /// Free rendered data
     pub fn gvFreeRenderData(data: *mut c_char);
-    
+
     // Error handling
-    
+
     /// Get last error
     pub fn aglasterr() -> *mut c_char;
-    
+
     /// Set error callback
     pub fn agseterr(err: c_int) -> c_int;
-    
+
     /// Error levels
     pub static AGWARN: c_int;
     pub static AGERR: c_int;
@@ -147,15 +150,15 @@ pub unsafe fn gv_init() -> *mut GVC_t {
     if gvc.is_null() {
         return gvc;
     }
-    
+
     // Register statically linked plugins
     gvAddLibrary(gvc, &gvplugin_dot_layout_LTX_library);
     gvAddLibrary(gvc, &gvplugin_neato_layout_LTX_library);
     gvAddLibrary(gvc, &gvplugin_core_LTX_library);
-    
+
     #[cfg(has_cairo)]
     gvAddLibrary(gvc, &gvplugin_pango_LTX_library);
-    
+
     gvc
 }
 
@@ -164,7 +167,7 @@ mod tests {
     use super::*;
     use std::ffi::CString;
     use std::ptr;
-    
+
     #[test]
     fn test_context_creation() {
         unsafe {
@@ -173,45 +176,45 @@ mod tests {
             gvFreeContext(gvc);
         }
     }
-    
+
     #[test]
     fn test_parse_simple_graph() {
         unsafe {
             let gvc = gv_init();
             assert!(!gvc.is_null());
-            
+
             let dot = CString::new("digraph { a -> b }").unwrap();
             let graph = agmemread(dot.as_ptr());
             assert!(!graph.is_null());
-            
+
             agclose(graph);
             gvFreeContext(gvc);
         }
     }
-    
+
     #[test]
     fn test_layout_and_render() {
         unsafe {
             let gvc = gv_init();
             assert!(!gvc.is_null());
-            
+
             let dot = CString::new("digraph { a -> b }").unwrap();
             let graph = agmemread(dot.as_ptr());
             assert!(!graph.is_null());
-            
+
             let layout = CString::new("dot").unwrap();
             let result = gvLayout(gvc, graph, layout.as_ptr());
             assert_eq!(result, 0);
-            
+
             let format = CString::new("svg").unwrap();
             let mut data: *mut c_char = ptr::null_mut();
             let mut len: c_uint = 0;
-            
+
             let result = gvRenderData(gvc, graph, format.as_ptr(), &mut data, &mut len);
             assert_eq!(result, 0);
             assert!(!data.is_null());
             assert!(len > 0);
-            
+
             gvFreeRenderData(data);
             gvFreeLayout(gvc, graph);
             agclose(graph);

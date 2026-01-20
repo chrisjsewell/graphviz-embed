@@ -14,18 +14,18 @@ fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let workspace_dir = manifest_dir.parent().unwrap();
-    
+
     let target = env::var("TARGET").unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let host = env::var("HOST").unwrap();
-    
+
     // Paths to vendored sources
     let graphviz_src = workspace_dir.join("vendor/graphviz");
     let expat_src = workspace_dir.join("vendor/expat/expat");
     let generated_dir = workspace_dir.join("generated");
     let patches_dir = workspace_dir.join("patches");
-    
+
     // Check that submodules are initialized
     if !graphviz_src.join("CMakeLists.txt").exists() {
         panic!(
@@ -35,7 +35,7 @@ fn main() {
             graphviz_src
         );
     }
-    
+
     if !expat_src.join("CMakeLists.txt").exists() {
         panic!(
             "Expat source not found at {:?}. \
@@ -44,25 +44,31 @@ fn main() {
             expat_src
         );
     }
-    
+
     // Create a working copy of graphviz source to apply patches
     let graphviz_build_src = out_dir.join("graphviz-src");
     if graphviz_build_src.exists() {
         fs::remove_dir_all(&graphviz_build_src).unwrap();
     }
-    copy_dir_recursive(&graphviz_src, &graphviz_build_src)
-        .expect("Failed to copy Graphviz source");
-    
+    copy_dir_recursive(&graphviz_src, &graphviz_build_src).expect("Failed to copy Graphviz source");
+
     // Copy pre-generated parser files
     copy_generated_files(&generated_dir, &graphviz_build_src)
         .expect("Failed to copy generated parser files");
-    
+
     // Apply patches to use pre-generated parsers
     apply_patches(&patches_dir, &graphviz_build_src);
-    
+
     // Build Expat first
-    let expat_install = build_expat(&expat_src, &out_dir, &target, &target_os, &target_arch, &host);
-    
+    let expat_install = build_expat(
+        &expat_src,
+        &out_dir,
+        &target,
+        &target_os,
+        &target_arch,
+        &host,
+    );
+
     // Build Graphviz
     let graphviz_install = build_graphviz(
         &graphviz_build_src,
@@ -73,14 +79,14 @@ fn main() {
         &target_arch,
         &host,
     );
-    
+
     // Emit linker directives
     emit_link_directives(&graphviz_install, &expat_install, &target_os);
-    
+
     // Handle Cairo feature
     #[cfg(feature = "cairo")]
     handle_cairo_feature(&target_os);
-    
+
     // Rerun if sources change
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=../vendor/graphviz");
@@ -95,9 +101,9 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
         let entry = entry?;
         let path = entry.path();
         let dest_path = dst.join(entry.file_name());
-        
+
         let file_type = entry.file_type()?;
-        
+
         if file_type.is_dir() {
             // Skip .git directory
             if path.file_name().map(|n| n == ".git").unwrap_or(false) {
@@ -154,7 +160,7 @@ fn copy_generated_files(generated_dir: &Path, graphviz_src: &Path) -> Result<(),
             }
         }
     }
-    
+
     // Copy common generated files
     let common_gen = generated_dir.join("common");
     let common_dst = graphviz_src.join("lib/common");
@@ -166,7 +172,7 @@ fn copy_generated_files(generated_dir: &Path, graphviz_src: &Path) -> Result<(),
             }
         }
     }
-    
+
     // Copy expr generated files
     let expr_gen = generated_dir.join("expr");
     let expr_dst = graphviz_src.join("lib/expr");
@@ -178,14 +184,14 @@ fn copy_generated_files(generated_dir: &Path, graphviz_src: &Path) -> Result<(),
             }
         }
     }
-    
+
     Ok(())
 }
 
 fn apply_patches(_patches_dir: &Path, graphviz_src: &Path) {
     // Instead of using patch files, directly modify CMakeLists.txt to use pre-generated parsers
     // This is more reliable across platforms
-    
+
     // Patch the main CMakeLists.txt to make BISON and FLEX optional
     let main_cmake = graphviz_src.join("CMakeLists.txt");
     if main_cmake.exists() {
@@ -193,7 +199,7 @@ fn apply_patches(_patches_dir: &Path, graphviz_src: &Path) {
         let patched = patch_main_cmake(&content);
         fs::write(&main_cmake, patched).unwrap();
     }
-    
+
     // Patch cgraph/CMakeLists.txt
     let cgraph_cmake = graphviz_src.join("lib/cgraph/CMakeLists.txt");
     if cgraph_cmake.exists() {
@@ -201,15 +207,15 @@ fn apply_patches(_patches_dir: &Path, graphviz_src: &Path) {
         let patched = patch_cgraph_cmake(&content);
         fs::write(&cgraph_cmake, patched).unwrap();
     }
-    
-    // Patch common/CMakeLists.txt  
+
+    // Patch common/CMakeLists.txt
     let common_cmake = graphviz_src.join("lib/common/CMakeLists.txt");
     if common_cmake.exists() {
         let content = fs::read_to_string(&common_cmake).unwrap();
         let patched = patch_common_cmake(&content);
         fs::write(&common_cmake, patched).unwrap();
     }
-    
+
     // Patch expr/CMakeLists.txt
     let expr_cmake = graphviz_src.join("lib/expr/CMakeLists.txt");
     if expr_cmake.exists() {
@@ -224,17 +230,19 @@ fn patch_main_cmake(content: &str) -> String {
     // Also disable GTS and other external dependencies
     // We use pre-generated parser files so these tools are not needed at build time
     let mut result = String::new();
-    
+
     for line in content.lines() {
         let trimmed = line.trim();
-        
+
         // Change BISON from REQUIRED to OPTIONAL
         if trimmed.contains("set_package_properties(BISON") && trimmed.contains("TYPE REQUIRED") {
             result.push_str("# BISON not required - using pre-generated parser files\n");
             result.push_str("# set_package_properties(BISON PROPERTIES TYPE REQUIRED)\n");
         }
         // Change FLEX from REQUIRED to OPTIONAL
-        else if trimmed.contains("set_package_properties(FLEX") && trimmed.contains("TYPE REQUIRED") {
+        else if trimmed.contains("set_package_properties(FLEX")
+            && trimmed.contains("TYPE REQUIRED")
+        {
             result.push_str("# FLEX not required - using pre-generated parser files\n");
             result.push_str("# set_package_properties(FLEX PROPERTIES TYPE REQUIRED)\n");
         }
@@ -251,13 +259,12 @@ fn patch_main_cmake(content: &str) -> String {
             result.push_str("# ");
             result.push_str(line);
             result.push('\n');
-        }
-        else {
+        } else {
             result.push_str(line);
             result.push('\n');
         }
     }
-    
+
     result
 }
 
@@ -266,15 +273,19 @@ fn patch_cgraph_cmake(content: &str) -> String {
     let mut result = String::new();
     let mut skip_until_empty = false;
     let mut added_replacement = false;
-    
+
     for line in content.lines() {
         let trimmed = line.trim();
-        
+
         // Skip BISON_TARGET block
-        if trimmed.starts_with("BISON_TARGET(Grammar") || trimmed.starts_with("BISON_TARGET(") && trimmed.contains("grammar.y") {
+        if trimmed.starts_with("BISON_TARGET(Grammar")
+            || trimmed.starts_with("BISON_TARGET(") && trimmed.contains("grammar.y")
+        {
             skip_until_empty = true;
             if !added_replacement {
-                result.push_str("# Use pre-generated parser files (no Bison/Flex required at build time)\n");
+                result.push_str(
+                    "# Use pre-generated parser files (no Bison/Flex required at build time)\n",
+                );
                 result.push_str("set(BISON_Grammar_OUTPUTS\n");
                 result.push_str("  ${CMAKE_CURRENT_SOURCE_DIR}/grammar.c\n");
                 result.push_str("  ${CMAKE_CURRENT_SOURCE_DIR}/grammar.h\n");
@@ -286,18 +297,20 @@ fn patch_cgraph_cmake(content: &str) -> String {
             }
             continue;
         }
-        
+
         // Skip FLEX_TARGET block
-        if trimmed.starts_with("FLEX_TARGET(Scan") || trimmed.starts_with("FLEX_TARGET(") && trimmed.contains("scan.l") {
+        if trimmed.starts_with("FLEX_TARGET(Scan")
+            || trimmed.starts_with("FLEX_TARGET(") && trimmed.contains("scan.l")
+        {
             skip_until_empty = true;
             continue;
         }
-        
+
         // Skip ADD_FLEX_BISON_DEPENDENCY
         if trimmed.starts_with("ADD_FLEX_BISON_DEPENDENCY") {
             continue;
         }
-        
+
         // Handle multi-line commands
         if skip_until_empty {
             if trimmed.ends_with(")") {
@@ -305,11 +318,11 @@ fn patch_cgraph_cmake(content: &str) -> String {
             }
             continue;
         }
-        
+
         result.push_str(line);
         result.push('\n');
     }
-    
+
     result
 }
 
@@ -317,15 +330,19 @@ fn patch_common_cmake(content: &str) -> String {
     let mut result = String::new();
     let mut skip_until_close = false;
     let mut added_replacement = false;
-    
+
     for line in content.lines() {
         let trimmed = line.trim();
-        
+
         // Skip BISON_TARGET block for HTMLparse
-        if trimmed.starts_with("BISON_TARGET(HTMLparse") || (trimmed.starts_with("BISON_TARGET(") && trimmed.contains("htmlparse.y")) {
+        if trimmed.starts_with("BISON_TARGET(HTMLparse")
+            || (trimmed.starts_with("BISON_TARGET(") && trimmed.contains("htmlparse.y"))
+        {
             skip_until_close = true;
             if !added_replacement {
-                result.push_str("# Use pre-generated parser files (no Bison required at build time)\n");
+                result.push_str(
+                    "# Use pre-generated parser files (no Bison required at build time)\n",
+                );
                 result.push_str("set(BISON_HTMLparse_OUTPUTS\n");
                 result.push_str("  ${CMAKE_CURRENT_SOURCE_DIR}/htmlparse.c\n");
                 result.push_str(")\n\n");
@@ -333,18 +350,18 @@ fn patch_common_cmake(content: &str) -> String {
             }
             continue;
         }
-        
+
         if skip_until_close {
             if trimmed.ends_with(")") {
                 skip_until_close = false;
             }
             continue;
         }
-        
+
         result.push_str(line);
         result.push('\n');
     }
-    
+
     result
 }
 
@@ -359,10 +376,10 @@ fn patch_expr_cmake(content: &str) -> String {
     let mut skip_until_close = false;
     let mut paren_depth = 0;
     let mut added_replacement = false;
-    
+
     for line in content.lines() {
         let trimmed = line.trim();
-        
+
         // Start of BISON_TARGET block (could just be "BISON_TARGET(" on its own line)
         if trimmed.starts_with("BISON_TARGET(") {
             skip_until_close = true;
@@ -372,7 +389,9 @@ fn patch_expr_cmake(content: &str) -> String {
                 skip_until_close = false;
             }
             if !added_replacement {
-                result.push_str("# Use pre-generated parser files (no Bison required at build time)\n");
+                result.push_str(
+                    "# Use pre-generated parser files (no Bison required at build time)\n",
+                );
                 result.push_str("set(BISON_Exparse_OUTPUTS\n");
                 result.push_str("  ${CMAKE_CURRENT_SOURCE_DIR}/exparse.c\n");
                 result.push_str("  ${CMAKE_CURRENT_SOURCE_DIR}/exparse.h\n");
@@ -381,7 +400,7 @@ fn patch_expr_cmake(content: &str) -> String {
             }
             continue;
         }
-        
+
         if skip_until_close {
             paren_depth += trimmed.matches('(').count() as i32;
             paren_depth -= trimmed.matches(')').count() as i32;
@@ -390,11 +409,11 @@ fn patch_expr_cmake(content: &str) -> String {
             }
             continue;
         }
-        
+
         result.push_str(line);
         result.push('\n');
     }
-    
+
     result
 }
 
@@ -407,7 +426,7 @@ fn build_expat(
     host: &str,
 ) -> PathBuf {
     let mut config = cmake::Config::new(src);
-    
+
     config
         .define("BUILD_SHARED_LIBS", "OFF")
         .define("EXPAT_BUILD_TOOLS", "OFF")
@@ -417,9 +436,9 @@ fn build_expat(
         .define("EXPAT_SHARED_LIBS", "OFF")
         .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
         .out_dir(out_dir.join("expat-build"));
-    
+
     configure_cmake_for_target(&mut config, target, target_os, target_arch, host);
-    
+
     config.build()
 }
 
@@ -433,7 +452,7 @@ fn build_graphviz(
     host: &str,
 ) -> PathBuf {
     let mut config = cmake::Config::new(src);
-    
+
     // Core build options
     config
         .define("BUILD_SHARED_LIBS", "OFF")
@@ -444,7 +463,10 @@ fn build_graphviz(
         .define("enable_ltdl", "OFF")
         // Point to our built expat
         .define("WITH_EXPAT", "ON")
-        .define("EXPAT_INCLUDE_DIR", expat_install.join("include").to_str().unwrap())
+        .define(
+            "EXPAT_INCLUDE_DIR",
+            expat_install.join("include").to_str().unwrap(),
+        )
         .define("EXPAT_LIBRARY", find_expat_lib(expat_install, target_os))
         // Disable optional features we don't need
         .define("with_gvedit", "OFF")
@@ -457,22 +479,22 @@ fn build_graphviz(
         // Disable GTS (GNU Triangulated Surface) - requires glib
         .define("WITH_GTS", "OFF")
         .out_dir(out_dir.join("graphviz-build"));
-    
+
     // Cairo/Pango handling
     #[cfg(feature = "cairo")]
     {
         // Let CMake auto-detect Cairo/Pango
     }
-    
+
     #[cfg(not(feature = "cairo"))]
     {
         config.define("with_gdk", "OFF");
         config.define("with_rsvg", "OFF");
         config.define("with_pangocairo", "OFF");
     }
-    
+
     configure_cmake_for_target(&mut config, target, target_os, target_arch, host);
-    
+
     config.build()
 }
 
@@ -490,7 +512,11 @@ fn configure_cmake_for_target(
             }
         }
         "macos" => {
-            let arch = if target_arch == "aarch64" { "arm64" } else { "x86_64" };
+            let arch = if target_arch == "aarch64" {
+                "arm64"
+            } else {
+                "x86_64"
+            };
             config.define("CMAKE_OSX_ARCHITECTURES", arch);
         }
         "linux" => {
@@ -508,23 +534,23 @@ fn configure_cmake_for_target(
 
 fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
     let lib_dir = expat_install.join("lib");
-    
+
     let lib_name = match target_os {
         "windows" => "expat.lib",
         _ => "libexpat.a",
     };
-    
+
     // Also check lib64 directory
     let lib_path = lib_dir.join(lib_name);
     if lib_path.exists() {
         return lib_path.to_str().unwrap().to_string();
     }
-    
+
     let lib64_path = expat_install.join("lib64").join(lib_name);
     if lib64_path.exists() {
         return lib64_path.to_str().unwrap().to_string();
     }
-    
+
     // Return the expected path anyway, CMake will error if not found
     lib_path.to_str().unwrap().to_string()
 }
@@ -532,50 +558,140 @@ fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
 fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os: &str) {
     // Add library search paths
     // The main install directory
-    println!("cargo:rustc-link-search=native={}/lib", graphviz_install.display());
-    println!("cargo:rustc-link-search=native={}/lib64", graphviz_install.display());
-    
+    println!(
+        "cargo:rustc-link-search=native={}/lib",
+        graphviz_install.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib64",
+        graphviz_install.display()
+    );
+
     // Plugins are built in the build directory, not installed
     let build_dir = graphviz_install.join("build");
-    println!("cargo:rustc-link-search=native={}/plugin/dot_layout", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/plugin/neato_layout", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/plugin/core", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/plugin/pango", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/plugin/quartz", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/plugin/kitty", build_dir.display());
-    
+    println!(
+        "cargo:rustc-link-search=native={}/plugin/dot_layout",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/plugin/neato_layout",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/plugin/core",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/plugin/pango",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/plugin/quartz",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/plugin/kitty",
+        build_dir.display()
+    );
+
     // Some internal libraries are also in the build dir
-    println!("cargo:rustc-link-search=native={}/lib/dotgen", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/neatogen", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/fdpgen", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/sfdpgen", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/twopigen", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/patchwork", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/circogen", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/osage", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/common", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/label", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/pack", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/ortho", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/rbtree", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/sparse", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/edgepaint", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/mingle", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/sfio", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/ast", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/expr", build_dir.display());
-    println!("cargo:rustc-link-search=native={}/lib/util", build_dir.display());
-    
+    println!(
+        "cargo:rustc-link-search=native={}/lib/dotgen",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/neatogen",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/fdpgen",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/sfdpgen",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/twopigen",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/patchwork",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/circogen",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/osage",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/common",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/label",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/pack",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/ortho",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/rbtree",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/sparse",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/edgepaint",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/mingle",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/sfio",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/ast",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/expr",
+        build_dir.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib/util",
+        build_dir.display()
+    );
+
     // Expat directories
-    println!("cargo:rustc-link-search=native={}/lib", expat_install.display());
-    println!("cargo:rustc-link-search=native={}/lib64", expat_install.display());
-    
+    println!(
+        "cargo:rustc-link-search=native={}/lib",
+        expat_install.display()
+    );
+    println!(
+        "cargo:rustc-link-search=native={}/lib64",
+        expat_install.display()
+    );
+
     // Link Graphviz libraries in dependency order
     // Plugins first (they depend on core libraries)
     println!("cargo:rustc-link-lib=static=gvplugin_dot_layout");
     println!("cargo:rustc-link-lib=static=gvplugin_neato_layout");
     println!("cargo:rustc-link-lib=static=gvplugin_core");
-    
+
     // Internal layout libraries (needed by plugins)
     println!("cargo:rustc-link-lib=static=dotgen");
     println!("cargo:rustc-link-lib=static=neatogen");
@@ -591,23 +707,23 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     println!("cargo:rustc-link-lib=static=pack");
     println!("cargo:rustc-link-lib=static=label");
     println!("cargo:rustc-link-lib=static=common");
-    
+
     // Core libraries
     println!("cargo:rustc-link-lib=static=gvc");
     println!("cargo:rustc-link-lib=static=cgraph");
     println!("cargo:rustc-link-lib=static=cdt");
     println!("cargo:rustc-link-lib=static=pathplan");
     println!("cargo:rustc-link-lib=static=xdot");
-    
+
     // Expression library (for gvpr)
     println!("cargo:rustc-link-lib=static=expr");
     println!("cargo:rustc-link-lib=static=sfio");
     println!("cargo:rustc-link-lib=static=ast");
     println!("cargo:rustc-link-lib=static=util");
-    
+
     // Expat for HTML labels
     println!("cargo:rustc-link-lib=static=expat");
-    
+
     // Platform-specific system libraries
     match target_os {
         "linux" => {
@@ -622,10 +738,10 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
         }
         _ => {}
     }
-    
+
     // Emit cfg flags for conditional compilation
     println!("cargo:rustc-check-cfg=cfg(has_cairo)");
-    
+
     #[cfg(feature = "cairo")]
     println!("cargo:rustc-cfg=has_cairo");
 }
@@ -641,7 +757,7 @@ fn handle_cairo_feature(target_os: &str) {
                 for path in &lib.link_paths {
                     println!("cargo:rustc-link-search=native={}", path.display());
                 }
-                
+
                 if let Ok(pango) = vcpkg::find_package("pango") {
                     for path in &pango.link_paths {
                         println!("cargo:rustc-link-search=native={}", path.display());
@@ -656,7 +772,7 @@ fn handle_cairo_feature(target_os: &str) {
                     println!("cargo:rustc-link-search=native={}", path.display());
                 }
             }
-            
+
             if let Ok(pangocairo) = pkg_config::probe_library("pangocairo") {
                 for path in &pangocairo.link_paths {
                     println!("cargo:rustc-link-search=native={}", path.display());
@@ -664,7 +780,7 @@ fn handle_cairo_feature(target_os: &str) {
             }
         }
     }
-    
+
     // Link Cairo and Pango
     println!("cargo:rustc-link-lib=cairo");
     println!("cargo:rustc-link-lib=pango-1.0");

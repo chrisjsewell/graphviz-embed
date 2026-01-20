@@ -75,23 +75,23 @@ pub enum Error {
     /// Failed to initialize Graphviz context
     #[error("failed to initialize Graphviz context")]
     InitFailed,
-    
+
     /// Failed to parse DOT source
     #[error("failed to parse DOT source: {0}")]
     ParseFailed(String),
-    
+
     /// Failed to apply layout
     #[error("failed to apply layout '{0}'")]
     LayoutFailed(String),
-    
+
     /// Failed to render output
     #[error("failed to render to format '{0}'")]
     RenderFailed(String),
-    
+
     /// Invalid input string (contains null bytes)
     #[error("invalid input: {0}")]
     InvalidInput(#[from] std::ffi::NulError),
-    
+
     /// Feature not enabled
     #[error("feature not enabled: {0}")]
     FeatureNotEnabled(&'static str),
@@ -160,19 +160,19 @@ pub enum Format {
     PlainExt,
     /// Canonical DOT
     Canon,
-    
+
     /// PNG raster image (requires `cairo` feature)
     #[cfg(feature = "cairo")]
     Png,
-    
+
     /// PDF document (requires `cairo` feature)
     #[cfg(feature = "cairo")]
     Pdf,
-    
+
     /// PostScript (requires `cairo` feature)
     #[cfg(feature = "cairo")]
     Ps,
-    
+
     /// Encapsulated PostScript (requires `cairo` feature)
     #[cfg(feature = "cairo")]
     Eps,
@@ -199,12 +199,17 @@ impl Format {
             Format::Eps => "eps",
         }
     }
-    
+
     /// Check if this format requires Cairo
     pub fn requires_cairo(&self) -> bool {
         match self {
-            Format::Svg | Format::Dot | Format::Xdot | Format::Json 
-            | Format::Plain | Format::PlainExt | Format::Canon => false,
+            Format::Svg
+            | Format::Dot
+            | Format::Xdot
+            | Format::Json
+            | Format::Plain
+            | Format::PlainExt
+            | Format::Canon => false,
             #[cfg(feature = "cairo")]
             Format::Png | Format::Pdf | Format::Ps | Format::Eps => true,
         }
@@ -255,28 +260,26 @@ impl GraphvizContext {
     pub fn new() -> Result<Self> {
         // Serialize access to Graphviz
         let _lock = GRAPHVIZ_MUTEX.lock().unwrap();
-        
+
         // Initialize Graphviz library (only once globally)
-        INIT.call_once(|| {
-            unsafe {
-                INIT_RESULT = true;
-            }
+        INIT.call_once(|| unsafe {
+            INIT_RESULT = true;
         });
-        
+
         unsafe {
             if !INIT_RESULT {
                 return Err(Error::InitFailed);
             }
-            
+
             let gvc = sys::gv_init();
             if gvc.is_null() {
                 return Err(Error::InitFailed);
             }
-            
+
             Ok(Self { gvc })
         }
     }
-    
+
     /// Render a DOT graph to the specified format
     ///
     /// # Arguments
@@ -307,29 +310,29 @@ impl GraphvizContext {
     pub fn render(&self, dot_source: &str, layout: Layout, format: Format) -> Result<Vec<u8>> {
         // Serialize access to Graphviz (C library has global state)
         let _lock = GRAPHVIZ_MUTEX.lock().unwrap();
-        
+
         let dot_cstring = CString::new(dot_source)?;
         let layout_cstring = CString::new(layout.as_str()).unwrap();
         let format_cstring = CString::new(format.as_str()).unwrap();
-        
+
         unsafe {
             // Parse the DOT source
             let graph = sys::agmemread(dot_cstring.as_ptr());
             if graph.is_null() {
                 return Err(Error::ParseFailed(get_last_error()));
             }
-            
+
             // Apply layout
             let result = sys::gvLayout(self.gvc, graph, layout_cstring.as_ptr());
             if result != 0 {
                 sys::agclose(graph);
                 return Err(Error::LayoutFailed(layout.to_string()));
             }
-            
+
             // Render to memory
             let mut data: *mut libc::c_char = ptr::null_mut();
             let mut len: libc::c_uint = 0;
-            
+
             let result = sys::gvRenderData(
                 self.gvc,
                 graph,
@@ -337,25 +340,25 @@ impl GraphvizContext {
                 &mut data,
                 &mut len,
             );
-            
+
             if result != 0 || data.is_null() {
                 sys::gvFreeLayout(self.gvc, graph);
                 sys::agclose(graph);
                 return Err(Error::RenderFailed(format.to_string()));
             }
-            
+
             // Copy data to Rust Vec
             let output = std::slice::from_raw_parts(data as *const u8, len as usize).to_vec();
-            
+
             // Cleanup
             sys::gvFreeRenderData(data);
             sys::gvFreeLayout(self.gvc, graph);
             sys::agclose(graph);
-            
+
             Ok(output)
         }
     }
-    
+
     /// Render a DOT graph and save to a file
     ///
     /// # Arguments
@@ -414,36 +417,36 @@ fn get_last_error() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_context_creation() {
         let ctx = GraphvizContext::new();
         assert!(ctx.is_ok());
     }
-    
+
     #[test]
     fn test_simple_render() {
         let ctx = GraphvizContext::new().unwrap();
         let result = ctx.render("digraph { a -> b }", Layout::Dot, Format::Svg);
         assert!(result.is_ok());
         let output = result.unwrap();
-    let svg = String::from_utf8_lossy(&output);
+        let svg = String::from_utf8_lossy(&output);
         assert!(svg.contains("<svg"));
         assert!(svg.contains("</svg>"));
     }
-    
+
     #[test]
     fn test_invalid_dot() {
         let ctx = GraphvizContext::new().unwrap();
         let result = ctx.render("this is not valid DOT", Layout::Dot, Format::Svg);
         assert!(result.is_err());
     }
-    
+
     #[test]
     fn test_all_layouts() {
         let ctx = GraphvizContext::new().unwrap();
         let dot = "digraph { a -> b -> c }";
-        
+
         for layout in [
             Layout::Dot,
             Layout::Neato,
@@ -455,14 +458,14 @@ mod tests {
             assert!(result.is_ok(), "Layout {:?} failed", layout);
         }
     }
-    
+
     #[test]
     fn test_json_output() {
         let ctx = GraphvizContext::new().unwrap();
         let result = ctx.render("digraph { a -> b }", Layout::Dot, Format::Json);
         assert!(result.is_ok());
         let output = result.unwrap();
-    let json = String::from_utf8_lossy(&output);
+        let json = String::from_utf8_lossy(&output);
         assert!(json.contains("\"name\""));
     }
 }
