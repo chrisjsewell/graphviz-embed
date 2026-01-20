@@ -576,136 +576,57 @@ fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
     lib_path.to_str().unwrap().to_string()
 }
 
+/// Helper to emit link search paths, handling Windows MSVC which puts libs in Release/ subdirs
+fn emit_link_search(base_path: &Path, subdir: &str, target_os: &str) {
+    let path = base_path.join(subdir);
+    println!("cargo:rustc-link-search=native={}", path.display());
+
+    // On Windows MSVC, CMake puts libraries in Release/ (or Debug/) subdirectories
+    if target_os == "windows" {
+        println!("cargo:rustc-link-search=native={}/Release", path.display());
+    }
+}
+
 fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os: &str) {
     // Add library search paths
     // The main install directory
-    println!(
-        "cargo:rustc-link-search=native={}/lib",
-        graphviz_install.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib64",
-        graphviz_install.display()
-    );
+    emit_link_search(graphviz_install, "lib", target_os);
+    emit_link_search(graphviz_install, "lib64", target_os);
 
     // Plugins are built in the build directory, not installed
     let build_dir = graphviz_install.join("build");
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/dot_layout",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/neato_layout",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/core",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/pango",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/quartz",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/kitty",
-        build_dir.display()
-    );
+    emit_link_search(&build_dir, "plugin/dot_layout", target_os);
+    emit_link_search(&build_dir, "plugin/neato_layout", target_os);
+    emit_link_search(&build_dir, "plugin/core", target_os);
+    emit_link_search(&build_dir, "plugin/pango", target_os);
+    emit_link_search(&build_dir, "plugin/quartz", target_os);
+    emit_link_search(&build_dir, "plugin/kitty", target_os);
 
     // Some internal libraries are also in the build dir
-    println!(
-        "cargo:rustc-link-search=native={}/lib/dotgen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/neatogen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/fdpgen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/sfdpgen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/twopigen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/patchwork",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/circogen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/osage",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/common",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/label",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/pack",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/ortho",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/rbtree",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/sparse",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/edgepaint",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/mingle",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/sfio",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/ast",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/expr",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/util",
-        build_dir.display()
-    );
+    emit_link_search(&build_dir, "lib/dotgen", target_os);
+    emit_link_search(&build_dir, "lib/neatogen", target_os);
+    emit_link_search(&build_dir, "lib/fdpgen", target_os);
+    emit_link_search(&build_dir, "lib/sfdpgen", target_os);
+    emit_link_search(&build_dir, "lib/twopigen", target_os);
+    emit_link_search(&build_dir, "lib/patchwork", target_os);
+    emit_link_search(&build_dir, "lib/circogen", target_os);
+    emit_link_search(&build_dir, "lib/osage", target_os);
+    emit_link_search(&build_dir, "lib/common", target_os);
+    emit_link_search(&build_dir, "lib/label", target_os);
+    emit_link_search(&build_dir, "lib/pack", target_os);
+    emit_link_search(&build_dir, "lib/ortho", target_os);
+    emit_link_search(&build_dir, "lib/rbtree", target_os);
+    emit_link_search(&build_dir, "lib/sparse", target_os);
+    emit_link_search(&build_dir, "lib/edgepaint", target_os);
+    emit_link_search(&build_dir, "lib/mingle", target_os);
+    emit_link_search(&build_dir, "lib/sfio", target_os);
+    emit_link_search(&build_dir, "lib/ast", target_os);
+    emit_link_search(&build_dir, "lib/expr", target_os);
+    emit_link_search(&build_dir, "lib/util", target_os);
 
     // Expat directories
-    println!(
-        "cargo:rustc-link-search=native={}/lib",
-        expat_install.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib64",
-        expat_install.display()
-    );
+    emit_link_search(expat_install, "lib", target_os);
+    emit_link_search(expat_install, "lib64", target_os);
 
     // Link Graphviz libraries
     // List libraries in reverse dependency order (dependencies last)
