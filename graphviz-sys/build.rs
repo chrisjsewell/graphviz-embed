@@ -526,6 +526,19 @@ fn configure_cmake_for_target(
                 config.define("CMAKE_SYSTEM_PROCESSOR", "aarch64");
                 config.define("CMAKE_C_COMPILER", "aarch64-linux-gnu-gcc");
                 config.define("CMAKE_CXX_COMPILER", "aarch64-linux-gnu-g++");
+
+                // Set sysroot for cross-compilation so CMake can find libraries
+                config.define("CMAKE_SYSROOT", "/usr/aarch64-linux-gnu");
+                config.define(
+                    "CMAKE_FIND_ROOT_PATH",
+                    "/usr/aarch64-linux-gnu;/usr/lib/aarch64-linux-gnu",
+                );
+                config.define("CMAKE_FIND_ROOT_PATH_MODE_LIBRARY", "BOTH");
+                config.define("CMAKE_FIND_ROOT_PATH_MODE_INCLUDE", "BOTH");
+
+                // Explicitly set MATH_LIB since Graphviz's find_library(MATH_LIB m)
+                // may fail during cross-compilation
+                config.define("MATH_LIB", "/usr/aarch64-linux-gnu/lib/libm.so.6");
             }
         }
         _ => {}
