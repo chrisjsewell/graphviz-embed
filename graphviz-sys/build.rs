@@ -570,11 +570,12 @@ fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
 
     // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON:
     // - Release: libexpatMT.lib (MT = Multi-threaded static CRT)
-    // - Debug: libexpatMTD.lib (MTD = Multi-threaded Debug static CRT)
+    // - Debug: libexpatdMT.lib (d = debug, MT = Multi-threaded static CRT)
+    // The expat CMake uses postfix format: [w][d][MD|MT]
     let lib_name = match target_os {
         "windows" => {
             if is_debug_build() {
-                "libexpatMTD.lib"
+                "libexpatdMT.lib"
             } else {
                 "libexpatMT.lib"
             }
@@ -768,12 +769,13 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // Expat library name differs on Windows with static CRT
     // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON:
     // - Release: libexpatMT.lib (MT = Multi-threaded static CRT)
-    // - Debug: libexpatMTD.lib (MTD = Multi-threaded Debug static CRT)
+    // - Debug: libexpatdMT.lib (d = debug, MT = Multi-threaded static CRT)
+    // The expat CMake uses postfix format: [w][d][MD|MT]
     // We use the :+verbatim modifier to specify the exact filename
     match target_os {
         "windows" => {
             let expat_lib = if is_debug_build() {
-                "libexpatMTD.lib"
+                "libexpatdMT.lib"
             } else {
                 "libexpatMT.lib"
             };
