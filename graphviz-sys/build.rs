@@ -445,6 +445,12 @@ fn build_expat(
         let is_debug = is_debug_build();
         println!("cargo:warning=MSVC CRT: static={}, debug={}", use_static_crt, is_debug);
         
+        // Set CMake build type to match Rust's profile
+        // This is critical: cmake crate defaults to Release, but we need Debug for debug builds
+        if is_debug {
+            config.profile("Debug");
+        }
+        
         if use_static_crt {
             config.define("EXPAT_MSVC_STATIC_CRT", "ON");
         }
@@ -517,16 +523,24 @@ fn build_graphviz(
     // This prevents __imp_XML_* symbol references
     // Also set the MSVC runtime library to match Rust's CRT setting
     if target_os == "windows" {
+        let is_debug = is_debug_build();
+        
+        // Set CMake build type to match Rust's profile
+        // This is critical: cmake crate defaults to Release, but we need Debug for debug builds
+        if is_debug {
+            config.profile("Debug");
+        }
+        
         // Set the MSVC runtime library to match Rust's CRT
         // CMake 3.15+ supports CMAKE_MSVC_RUNTIME_LIBRARY
         let msvc_runtime = if is_static_crt() {
-            if is_debug_build() {
+            if is_debug {
                 "MultiThreadedDebug"      // /MTd
             } else {
                 "MultiThreaded"           // /MT
             }
         } else {
-            if is_debug_build() {
+            if is_debug {
                 "MultiThreadedDebugDLL"   // /MDd
             } else {
                 "MultiThreadedDLL"        // /MD
