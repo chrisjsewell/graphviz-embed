@@ -573,11 +573,12 @@ fn configure_cmake_for_target(
 ) {
     match target_os {
         "windows" => {
-            if target.contains("msvc") {
-                // Use cmake crate's static_crt() method to match Rust's CRT setting
-                // This properly sets compiler flags for the chosen runtime library
-                config.static_crt(is_static_crt());
-            }
+            // NOTE: Do NOT use cmake crate's static_crt() here for MSVC!
+            // The static_crt() method only adds /MT or /MD flags, but doesn't handle
+            // debug vs release (/MTd vs /MT, /MDd vs /MD). We rely on CMAKE_MSVC_RUNTIME_LIBRARY
+            // which is set in build_expat() and build_graphviz() with the correct debug/release
+            // and static/dynamic CRT settings.
+            let _ = target; // Suppress unused variable warning
         }
         "macos" => {
             let arch = if target_arch == "aarch64" {
