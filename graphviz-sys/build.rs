@@ -641,8 +641,47 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     emit_link_search(expat_install, "lib64", target_os);
 
     // Link Graphviz libraries
-    // List libraries in reverse dependency order (dependencies last)
+    // IMPORTANT: Libraries must be listed so that dependencies come AFTER dependents.
+    // On MSVC, the linker resolves symbols left-to-right, looking in later libraries.
+    // So if A depends on B, order should be: A then B.
 
+    // 1. Plugins (depend on gvc, layout engines, core libs)
+    println!("cargo:rustc-link-lib=static=gvplugin_neato_layout");
+    println!("cargo:rustc-link-lib=static=gvplugin_dot_layout");
+    println!("cargo:rustc-link-lib=static=gvplugin_core");
+
+    // 2. GVC (depends on cgraph, common, plugins infrastructure)
+    println!("cargo:rustc-link-lib=static=gvc");
+
+    // 3. Layout engines (depend on common, cgraph, pathplan, etc.)
+    println!("cargo:rustc-link-lib=static=osage");
+    println!("cargo:rustc-link-lib=static=circogen");
+    println!("cargo:rustc-link-lib=static=patchwork");
+    println!("cargo:rustc-link-lib=static=twopigen");
+    println!("cargo:rustc-link-lib=static=sfdpgen");
+    println!("cargo:rustc-link-lib=static=fdpgen");
+    println!("cargo:rustc-link-lib=static=neatogen");
+    println!("cargo:rustc-link-lib=static=dotgen");
+
+    // 4. Mid-level libraries (depend on cgraph, cdt, etc.)
+    println!("cargo:rustc-link-lib=static=expr");
+    println!("cargo:rustc-link-lib=static=sparse");
+    println!("cargo:rustc-link-lib=static=rbtree");
+    println!("cargo:rustc-link-lib=static=ortho");
+    println!("cargo:rustc-link-lib=static=pack");
+    println!("cargo:rustc-link-lib=static=label");
+    println!("cargo:rustc-link-lib=static=common");
+    println!("cargo:rustc-link-lib=static=xdot");
+    println!("cargo:rustc-link-lib=static=pathplan");
+    println!("cargo:rustc-link-lib=static=cgraph");
+    println!("cargo:rustc-link-lib=static=cdt");
+
+    // 5. Low-level utility libraries
+    println!("cargo:rustc-link-lib=static=sfio");
+    println!("cargo:rustc-link-lib=static=ast");
+    println!("cargo:rustc-link-lib=static=util");
+
+    // 6. External dependencies (lowest level)
     // Expat library name differs on Windows with static CRT
     // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON, the library is named libexpatMT.lib
     // We use the :+verbatim modifier to specify the exact filename
@@ -650,32 +689,6 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
         "windows" => println!("cargo:rustc-link-lib=static:+verbatim=libexpatMT.lib"),
         _ => println!("cargo:rustc-link-lib=static=expat"),
     }
-    println!("cargo:rustc-link-lib=static=util");
-    println!("cargo:rustc-link-lib=static=ast");
-    println!("cargo:rustc-link-lib=static=sfio");
-    println!("cargo:rustc-link-lib=static=cdt");
-    println!("cargo:rustc-link-lib=static=cgraph");
-    println!("cargo:rustc-link-lib=static=pathplan");
-    println!("cargo:rustc-link-lib=static=xdot");
-    println!("cargo:rustc-link-lib=static=common");
-    println!("cargo:rustc-link-lib=static=label");
-    println!("cargo:rustc-link-lib=static=pack");
-    println!("cargo:rustc-link-lib=static=ortho");
-    println!("cargo:rustc-link-lib=static=rbtree");
-    println!("cargo:rustc-link-lib=static=sparse");
-    println!("cargo:rustc-link-lib=static=expr");
-    println!("cargo:rustc-link-lib=static=dotgen");
-    println!("cargo:rustc-link-lib=static=neatogen");
-    println!("cargo:rustc-link-lib=static=fdpgen");
-    println!("cargo:rustc-link-lib=static=sfdpgen");
-    println!("cargo:rustc-link-lib=static=twopigen");
-    println!("cargo:rustc-link-lib=static=patchwork");
-    println!("cargo:rustc-link-lib=static=circogen");
-    println!("cargo:rustc-link-lib=static=osage");
-    println!("cargo:rustc-link-lib=static=gvc");
-    println!("cargo:rustc-link-lib=static=gvplugin_core");
-    println!("cargo:rustc-link-lib=static=gvplugin_dot_layout");
-    println!("cargo:rustc-link-lib=static=gvplugin_neato_layout");
 
     // Platform-specific system libraries
     match target_os {
