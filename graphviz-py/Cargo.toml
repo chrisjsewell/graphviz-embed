@@ -14,8 +14,12 @@ name = "graphviz_py"
 crate-type = ["cdylib"]
 
 [dependencies]
+graphviz-sys = { path = "../graphviz-sys", features = ["cdylib"] }
 graphviz-embed = { path = "../graphviz-embed" }
 pyo3 = { version = "0.22", features = ["extension-module"] }
 
 [build-dependencies]
 pyo3-build-config = "0.22"
+
+[features]
+cairo = ["graphviz-embed/cairo"]

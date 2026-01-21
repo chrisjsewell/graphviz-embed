@@ -67,6 +67,7 @@ name = "graphviz-py"
 version = "0.1.0"
 dependencies = [
  "graphviz-embed",
+ "graphviz-sys",
  "pyo3",
  "pyo3-build-config",
 ]

@@ -119,6 +119,10 @@ fn main() {
     #[cfg(feature = "cairo")]
     handle_cairo_feature(&target_os);
 
+    // Export OUT_DIR for downstream crates (e.g., Python bindings)
+    // This allows them to find the built libraries for whole-archive linking
+    println!("cargo:out-dir={}", out_dir.display());
+
     // Rerun if sources change
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed={}", graphviz_src.display());
@@ -823,10 +827,23 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // We use -bundle to prevent bundling into the rlib, instead letting the linker
     // find them at final link time. This is more reliable on Windows where library
     // bundling can fail silently.
+    //
+    // For cdylib builds (Python extensions), we need whole-archive linking to include
+    // all symbols. This is controlled via the "cdylib" feature.
+    let is_cdylib = cfg!(feature = "cdylib");
+    
+    if is_cdylib {
+        eprintln!("graphviz-sys: Building with cdylib feature (whole-archive linking)");
+    }
+    
     let link_lib = |name: &str| {
         // Use -bundle on Windows to defer linking to final link step
+        // Use whole-archive for cdylib on Linux to include all symbols
         if target_os == "windows" {
             println!("cargo:rustc-link-lib=static:-bundle={}", name);
+        } else if is_cdylib {
+            // Force whole-archive linking for cdylib (Python extensions)
+            println!("cargo:rustc-link-lib=static:+whole-archive={}", name);
         } else {
             println!("cargo:rustc-link-lib=static={}", name);
         }
