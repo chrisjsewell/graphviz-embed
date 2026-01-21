@@ -643,8 +643,12 @@ fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
 }
 
 /// Helper to emit link search paths, handling Windows MSVC which puts libs in Release/ subdirs
-fn emit_link_search(base_path: &Path, subdir: &str, target_os: &str) {
-    let path = base_path.join(subdir);
+/// Takes path components as a slice to avoid forward-slash issues on Windows
+fn emit_link_search(base_path: &Path, components: &[&str], target_os: &str) {
+    let mut path = base_path.to_path_buf();
+    for component in components {
+        path = path.join(component);
+    }
     println!("cargo:rustc-link-search=native={}", path.display());
 
     // On Windows MSVC, CMake puts libraries in Release/ or Debug/ subdirectories
@@ -658,8 +662,11 @@ fn emit_link_search(base_path: &Path, subdir: &str, target_os: &str) {
 }
 
 /// Emit link search path with debug output
-fn emit_link_search_debug(base_path: &Path, subdir: &str, target_os: &str, label: &str) {
-    let path = base_path.join(subdir);
+fn emit_link_search_debug(base_path: &Path, components: &[&str], target_os: &str, label: &str) {
+    let mut path = base_path.to_path_buf();
+    for component in components {
+        path = path.join(component);
+    }
     println!("cargo:warning=Link search [{}]: {}", label, path.display());
     println!("cargo:rustc-link-search=native={}", path.display());
 
@@ -732,49 +739,49 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
 
     // Add library search paths
     // The main install directory
-    emit_link_search_debug(graphviz_install, "lib", target_os, "install/lib");
-    emit_link_search(graphviz_install, "lib64", target_os);
+    emit_link_search_debug(graphviz_install, &["lib"], target_os, "install/lib");
+    emit_link_search(graphviz_install, &["lib64"], target_os);
 
     // Plugins are built in the build directory, not installed
     let build_dir = graphviz_install.join("build");
-    emit_link_search_debug(&build_dir, "plugin/dot_layout", target_os, "plugin/dot_layout");
-    emit_link_search_debug(&build_dir, "plugin/neato_layout", target_os, "plugin/neato_layout");
-    emit_link_search_debug(&build_dir, "plugin/core", target_os, "plugin/core");
-    emit_link_search(&build_dir, "plugin/pango", target_os);
-    emit_link_search(&build_dir, "plugin/quartz", target_os);
-    emit_link_search(&build_dir, "plugin/kitty", target_os);
+    emit_link_search_debug(&build_dir, &["plugin", "dot_layout"], target_os, "plugin/dot_layout");
+    emit_link_search_debug(&build_dir, &["plugin", "neato_layout"], target_os, "plugin/neato_layout");
+    emit_link_search_debug(&build_dir, &["plugin", "core"], target_os, "plugin/core");
+    emit_link_search(&build_dir, &["plugin", "pango"], target_os);
+    emit_link_search(&build_dir, &["plugin", "quartz"], target_os);
+    emit_link_search(&build_dir, &["plugin", "kitty"], target_os);
 
     // Some internal libraries are also in the build dir
-    emit_link_search(&build_dir, "lib/dotgen", target_os);
-    emit_link_search(&build_dir, "lib/neatogen", target_os);
-    emit_link_search(&build_dir, "lib/fdpgen", target_os);
-    emit_link_search(&build_dir, "lib/sfdpgen", target_os);
-    emit_link_search(&build_dir, "lib/twopigen", target_os);
-    emit_link_search(&build_dir, "lib/patchwork", target_os);
-    emit_link_search(&build_dir, "lib/circogen", target_os);
-    emit_link_search(&build_dir, "lib/osage", target_os);
-    emit_link_search(&build_dir, "lib/common", target_os);
-    emit_link_search(&build_dir, "lib/label", target_os);
-    emit_link_search(&build_dir, "lib/pack", target_os);
-    emit_link_search(&build_dir, "lib/ortho", target_os);
-    emit_link_search(&build_dir, "lib/rbtree", target_os);
-    emit_link_search(&build_dir, "lib/sparse", target_os);
-    emit_link_search(&build_dir, "lib/edgepaint", target_os);
-    emit_link_search(&build_dir, "lib/mingle", target_os);
-    emit_link_search(&build_dir, "lib/sfio", target_os);
-    emit_link_search(&build_dir, "lib/ast", target_os);
-    emit_link_search(&build_dir, "lib/expr", target_os);
-    emit_link_search(&build_dir, "lib/util", target_os);
+    emit_link_search(&build_dir, &["lib", "dotgen"], target_os);
+    emit_link_search(&build_dir, &["lib", "neatogen"], target_os);
+    emit_link_search(&build_dir, &["lib", "fdpgen"], target_os);
+    emit_link_search(&build_dir, &["lib", "sfdpgen"], target_os);
+    emit_link_search(&build_dir, &["lib", "twopigen"], target_os);
+    emit_link_search(&build_dir, &["lib", "patchwork"], target_os);
+    emit_link_search(&build_dir, &["lib", "circogen"], target_os);
+    emit_link_search(&build_dir, &["lib", "osage"], target_os);
+    emit_link_search(&build_dir, &["lib", "common"], target_os);
+    emit_link_search(&build_dir, &["lib", "label"], target_os);
+    emit_link_search(&build_dir, &["lib", "pack"], target_os);
+    emit_link_search(&build_dir, &["lib", "ortho"], target_os);
+    emit_link_search(&build_dir, &["lib", "rbtree"], target_os);
+    emit_link_search(&build_dir, &["lib", "sparse"], target_os);
+    emit_link_search(&build_dir, &["lib", "edgepaint"], target_os);
+    emit_link_search(&build_dir, &["lib", "mingle"], target_os);
+    emit_link_search(&build_dir, &["lib", "sfio"], target_os);
+    emit_link_search(&build_dir, &["lib", "ast"], target_os);
+    emit_link_search(&build_dir, &["lib", "expr"], target_os);
+    emit_link_search(&build_dir, &["lib", "util"], target_os);
     // Core libraries - use debug versions for key paths
-    emit_link_search_debug(&build_dir, "lib/cgraph", target_os, "lib/cgraph");
-    emit_link_search(&build_dir, "lib/cdt", target_os);
-    emit_link_search_debug(&build_dir, "lib/gvc", target_os, "lib/gvc");
-    emit_link_search(&build_dir, "lib/pathplan", target_os);
-    emit_link_search(&build_dir, "lib/xdot", target_os);
+    emit_link_search_debug(&build_dir, &["lib", "cgraph"], target_os, "lib/cgraph");
+    emit_link_search(&build_dir, &["lib", "cdt"], target_os);
+    emit_link_search_debug(&build_dir, &["lib", "gvc"], target_os, "lib/gvc");
+    emit_link_search(&build_dir, &["lib", "pathplan"], target_os);
+    emit_link_search(&build_dir, &["lib", "xdot"], target_os);
 
     // Expat directories
-    emit_link_search_debug(expat_install, "lib", target_os, "expat/lib");
-    emit_link_search(expat_install, "lib64", target_os);
+    emit_link_search_debug(expat_install, &["lib"], target_os, "expat/lib");
+    emit_link_search(expat_install, &["lib64"], target_os);
 
     // Link Graphviz libraries
     // IMPORTANT: Libraries must be listed so that dependencies come AFTER dependents.
