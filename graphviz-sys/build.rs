@@ -438,27 +438,14 @@ fn build_expat(
         .out_dir(out_dir.join("expat-build"));
 
     // Match Rust's CRT setting:
-    // - When Rust uses static CRT (+crt-static), use /MT or /MTd
-    // - When Rust uses dynamic CRT (default), use /MD or /MDd
+    // - When Rust uses static CRT (+crt-static), use /MT
+    // - When Rust uses dynamic CRT (default), use /MD
+    // NOTE: Rust ALWAYS uses release CRT, even in debug builds. The debug CRT
+    // variants (/MTd, /MDd) are never used by Rust's standard library.
     if target.contains("msvc") {
         let use_static_crt = is_static_crt();
-        let is_debug = is_debug_build();
-        println!("cargo:warning=MSVC CRT: static={}, debug={}", use_static_crt, is_debug);
-        
-        // Set CMake build type to match Rust's profile
-        // This is critical: cmake crate defaults to Release, but we need Debug for debug builds
-        if is_debug {
-            config.profile("Debug");
-        }
-        
-        // Determine the correct CRT flag
-        // /MT = static release, /MTd = static debug
-        // /MD = dynamic release, /MDd = dynamic debug
-        let crt_flag = if use_static_crt {
-            if is_debug { "/MTd" } else { "/MT" }
-        } else {
-            if is_debug { "/MDd" } else { "/MD" }
-        };
+        let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
+        println!("cargo:warning=MSVC CRT: static={}, flag={}", use_static_crt, crt_flag);
         
         // Use cflag() to add compiler flags directly - this is more reliable than
         // CMAKE_MSVC_RUNTIME_LIBRARY or EXPAT_MSVC_STATIC_CRT which can be overridden
@@ -523,30 +510,22 @@ fn build_graphviz(
     // This prevents __imp_XML_* symbol references
     // Also set the MSVC runtime library to match Rust's CRT setting
     if target_os == "windows" {
-        let is_debug = is_debug_build();
         let use_static_crt = is_static_crt();
         
-        // Set CMake build type to match Rust's profile
-        // This is critical: cmake crate defaults to Release, but we need Debug for debug builds
-        if is_debug {
-            config.profile("Debug");
-        }
-        
         // Determine the correct CRT flag
-        // /MT = static release, /MTd = static debug
-        // /MD = dynamic release, /MDd = dynamic debug
-        let crt_flag = if use_static_crt {
-            if is_debug { "/MTd" } else { "/MT" }
-        } else {
-            if is_debug { "/MDd" } else { "/MD" }
-        };
+        // NOTE: Rust ALWAYS uses release CRT (/MT or /MD), even in debug builds.
+        // The debug CRT variants (/MTd, /MDd) are never used by Rust's standard library.
+        let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
         println!("cargo:warning=Setting MSVC CRT flag: {}", crt_flag);
         
         // Use cflag() to add compiler flags directly - this is more reliable than
         // CMAKE_MSVC_RUNTIME_LIBRARY which can be overridden by project CMakeLists.txt
         config.cflag(crt_flag);
         
-        // Tell Graphviz that Expat is statically linked (not a DLL)
+        // Tell Graphviz that Expat is statically linked (not a DLL).
+        // This is always needed because we build Expat with BUILD_SHARED_LIBS=OFF.
+        // Note: This is independent of the CRT setting (MT/MD) - XML_STATIC controls
+        // whether Expat functions use __declspec(dllimport) in their declarations.
         config.cflag("/DXML_STATIC");
     }
 
@@ -609,13 +588,6 @@ fn configure_cmake_for_target(
     }
 }
 
-/// Determine if we're building in debug or release profile
-fn is_debug_build() -> bool {
-    // The cmake crate follows Cargo's profile, so we need to check the profile
-    // OPT_LEVEL is "0" for debug, "1", "2", or "3" for release
-    env::var("OPT_LEVEL").map(|v| v == "0").unwrap_or(false)
-}
-
 /// Determine if Rust is using static CRT
 /// This checks the CARGO_CFG_TARGET_FEATURE env var for "crt-static"
 fn is_static_crt() -> bool {
@@ -629,19 +601,19 @@ fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
 
     // On Windows MSVC, expat library naming follows the pattern: libexpat[w][d][MD|MT].lib
     // - [w] = unicode (we don't use this)
-    // - [d] = debug build (lowercase 'd')
+    // - [d] = debug build (lowercase 'd') - NOT USED, Rust always uses release CRT
     // - MD = dynamic CRT, MT = static CRT
     //
+    // NOTE: Rust ALWAYS uses release CRT (/MT or /MD), even in debug builds.
+    // So we always build Expat without the 'd' debug suffix.
+    //
     // Examples:
-    // - Release + dynamic CRT: libexpatMD.lib
-    // - Debug + dynamic CRT: libexpatdMD.lib  
-    // - Release + static CRT: libexpatMT.lib
-    // - Debug + static CRT: libexpatdMT.lib
+    // - Dynamic CRT (default): libexpatMD.lib
+    // - Static CRT (+crt-static): libexpatMT.lib
     let lib_name = match target_os {
         "windows" => {
-            let debug_suffix = if is_debug_build() { "d" } else { "" };
             let crt_suffix = if is_static_crt() { "MT" } else { "MD" };
-            format!("libexpat{}{}.lib", debug_suffix, crt_suffix)
+            format!("libexpat{}.lib", crt_suffix)
         }
         _ => "libexpat.a".to_string(),
     };
@@ -834,14 +806,14 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // - [d] = debug build (lowercase 'd')
     // - MD = dynamic CRT, MT = static CRT
     // We match Rust's CRT setting (detected via CARGO_CFG_TARGET_FEATURE)
+    // NOTE: Rust ALWAYS uses release CRT, so no 'd' debug suffix needed.
     // We use the :+verbatim modifier to specify the exact filename
     match target_os {
         "windows" => {
-            let debug_suffix = if is_debug_build() { "d" } else { "" };
             let crt_suffix = if is_static_crt() { "MT" } else { "MD" };
-            let expat_lib = format!("libexpat{}{}.lib", debug_suffix, crt_suffix);
-            println!("cargo:warning=Using expat library: {} (debug={}, static_crt={})", 
-                     expat_lib, is_debug_build(), is_static_crt());
+            let expat_lib = format!("libexpat{}.lib", crt_suffix);
+            println!("cargo:warning=Using expat library: {} (static_crt={})", 
+                     expat_lib, is_static_crt());
             println!("cargo:rustc-link-lib=static:+verbatim={}", expat_lib);
         }
         _ => println!("cargo:rustc-link-lib=static=expat"),
