@@ -47,13 +47,15 @@ impl PyGraphvizContext {
     ///     >>> ctx = GraphvizContext()
     ///     >>> svg = ctx.render("digraph { a -> b }", "dot", "svg")
     ///     >>> print(svg.decode('utf-8'))
-    fn render(&self, dot_source: &str, layout: &str, format: &str) -> PyResult<Vec<u8>> {
+    fn render<'py>(&self, py: Python<'py>, dot_source: &str, layout: &str, format: &str) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
         let rust_layout = parse_layout(layout)?;
         let rust_format = parse_format(format)?;
 
-        self.ctx
+        let output = self.ctx
             .render(dot_source, rust_layout, rust_format)
-            .map_err(|e| PyRuntimeError::new_err(format!("Rendering failed: {}", e)))
+            .map_err(|e| PyRuntimeError::new_err(format!("Rendering failed: {}", e)))?;
+        
+        Ok(pyo3::types::PyBytes::new_bound(py, &output))
     }
 
     /// Render a DOT graph and save to a file
@@ -159,9 +161,9 @@ fn parse_format(format: &str) -> PyResult<RustFormat> {
 ///     >>> print(svg.decode('utf-8'))
 #[pyfunction]
 #[pyo3(signature = (dot_source, layout="dot"))]
-fn render_svg(dot_source: &str, layout: &str) -> PyResult<Vec<u8>> {
+fn render_svg<'py>(py: Python<'py>, dot_source: &str, layout: &str) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
     let ctx = PyGraphvizContext::new()?;
-    ctx.render(dot_source, layout, "svg")
+    ctx.render(py, dot_source, layout, "svg")
 }
 
 /// A convenience function to render DOT source to PNG
@@ -183,9 +185,9 @@ fn render_svg(dot_source: &str, layout: &str) -> PyResult<Vec<u8>> {
 ///     ...     f.write(png)
 #[pyfunction]
 #[pyo3(signature = (dot_source, layout="dot"))]
-fn render_png(dot_source: &str, layout: &str) -> PyResult<Vec<u8>> {
+fn render_png<'py>(py: Python<'py>, dot_source: &str, layout: &str) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
     let ctx = PyGraphvizContext::new()?;
-    ctx.render(dot_source, layout, "png")
+    ctx.render(py, dot_source, layout, "png")
 }
 
 /// Python module for graphviz-embed

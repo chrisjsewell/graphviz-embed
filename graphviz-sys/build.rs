@@ -828,22 +828,18 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // find them at final link time. This is more reliable on Windows where library
     // bundling can fail silently.
     //
-    // For cdylib builds (Python extensions), we need whole-archive linking to include
-    // all symbols. This is controlled via the "cdylib" feature.
+    // For cdylib builds (Python extensions), we use normal static linking but with
+    // --allow-multiple-definition to handle any duplicates.
     let is_cdylib = cfg!(feature = "cdylib");
     
     if is_cdylib {
-        eprintln!("graphviz-sys: Building with cdylib feature (whole-archive linking)");
+        eprintln!("graphviz-sys: Building with cdylib feature");
     }
     
     let link_lib = |name: &str| {
         // Use -bundle on Windows to defer linking to final link step
-        // Use whole-archive for cdylib on Linux to include all symbols
         if target_os == "windows" {
             println!("cargo:rustc-link-lib=static:-bundle={}", name);
-        } else if is_cdylib {
-            // Force whole-archive linking for cdylib (Python extensions)
-            println!("cargo:rustc-link-lib=static:+whole-archive={}", name);
         } else {
             println!("cargo:rustc-link-lib=static={}", name);
         }
