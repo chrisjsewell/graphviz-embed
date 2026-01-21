@@ -273,7 +273,11 @@ During development, several challenges were encountered that may be useful for c
 
 ### Windows
 
-- **MSVC**: Use static CRT linking (`/MT`) for standalone binaries
+- **MSVC**: Builds use dynamic CRT (`/MD`, `/MDd`) by default to match Rust's defaults
+- **Static CRT**: For standalone binaries without MSVC runtime dependencies, use:
+  ```bash
+  RUSTFLAGS='-C target-feature=+crt-static' cargo build --release
+  ```
 - **MinGW**: Not currently tested; may require additional configuration
 - **Cairo**: Install via vcpkg: `vcpkg install cairo pango`
 - **vcpkg Integration**: Set `VCPKG_ROOT` environment variable

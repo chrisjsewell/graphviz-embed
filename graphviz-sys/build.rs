@@ -442,10 +442,21 @@ fn build_expat(
     // - When Rust uses dynamic CRT (default), use EXPAT_MSVC_STATIC_CRT=OFF -> /MD or /MDd
     if target.contains("msvc") {
         let use_static_crt = is_static_crt();
-        println!("cargo:warning=MSVC CRT: static={}", use_static_crt);
+        let is_debug = is_debug_build();
+        println!("cargo:warning=MSVC CRT: static={}, debug={}", use_static_crt, is_debug);
+        
         if use_static_crt {
             config.define("EXPAT_MSVC_STATIC_CRT", "ON");
         }
+        
+        // Also set CMAKE_MSVC_RUNTIME_LIBRARY for CMake 3.15+ compatibility
+        let msvc_runtime = if use_static_crt {
+            if is_debug { "MultiThreadedDebug" } else { "MultiThreaded" }
+        } else {
+            if is_debug { "MultiThreadedDebugDLL" } else { "MultiThreadedDLL" }
+        };
+        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", msvc_runtime);
+        config.define("CMAKE_POLICY_DEFAULT_CMP0091", "NEW");
     }
 
     configure_cmake_for_target(&mut config, target, target_os, target_arch, host);
@@ -504,7 +515,30 @@ fn build_graphviz(
 
     // On Windows, tell Graphviz that Expat is statically linked (not a DLL)
     // This prevents __imp_XML_* symbol references
+    // Also set the MSVC runtime library to match Rust's CRT setting
     if target_os == "windows" {
+        // Set the MSVC runtime library to match Rust's CRT
+        // CMake 3.15+ supports CMAKE_MSVC_RUNTIME_LIBRARY
+        let msvc_runtime = if is_static_crt() {
+            if is_debug_build() {
+                "MultiThreadedDebug"      // /MTd
+            } else {
+                "MultiThreaded"           // /MT
+            }
+        } else {
+            if is_debug_build() {
+                "MultiThreadedDebugDLL"   // /MDd
+            } else {
+                "MultiThreadedDLL"        // /MD
+            }
+        };
+        println!("cargo:warning=Setting CMAKE_MSVC_RUNTIME_LIBRARY={}", msvc_runtime);
+        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", msvc_runtime);
+        
+        // Also need to set policy CMP0091 to NEW to use CMAKE_MSVC_RUNTIME_LIBRARY
+        config.define("CMAKE_POLICY_DEFAULT_CMP0091", "NEW");
+        
+        // Tell Graphviz that Expat is statically linked (not a DLL)
         config.define("CMAKE_C_FLAGS", "/DXML_STATIC");
     }
 
