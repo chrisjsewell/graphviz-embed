@@ -650,8 +650,23 @@ fn emit_link_search(base_path: &Path, subdir: &str, target_os: &str) {
     // On Windows MSVC, CMake puts libraries in Release/ or Debug/ subdirectories
     // depending on the build profile. Add both to be safe.
     if target_os == "windows" {
-        println!("cargo:rustc-link-search=native={}/Release", path.display());
-        println!("cargo:rustc-link-search=native={}/Debug", path.display());
+        let release_path = path.join("Release");
+        let debug_path = path.join("Debug");
+        println!("cargo:rustc-link-search=native={}", release_path.display());
+        println!("cargo:rustc-link-search=native={}", debug_path.display());
+    }
+}
+
+/// Emit link search path with debug output
+fn emit_link_search_debug(base_path: &Path, subdir: &str, target_os: &str, label: &str) {
+    let path = base_path.join(subdir);
+    println!("cargo:warning=Link search [{}]: {}", label, path.display());
+    println!("cargo:rustc-link-search=native={}", path.display());
+
+    if target_os == "windows" {
+        let release_path = path.join("Release");
+        println!("cargo:warning=Link search [{}]: {}", label, release_path.display());
+        println!("cargo:rustc-link-search=native={}", release_path.display());
     }
 }
 
@@ -712,19 +727,19 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
 
     // Debug: List what libraries exist in Expat directories
     debug_list_libs(&expat_install.join("lib"), "expat install/lib");
-    debug_list_libs(&expat_install.join("lib/Debug"), "expat install/lib/Debug");
-    debug_list_libs(&expat_install.join("lib/Release"), "expat install/lib/Release");
+    debug_list_libs(&expat_install.join("lib").join("Debug"), "expat install/lib/Debug");
+    debug_list_libs(&expat_install.join("lib").join("Release"), "expat install/lib/Release");
 
     // Add library search paths
     // The main install directory
-    emit_link_search(graphviz_install, "lib", target_os);
+    emit_link_search_debug(graphviz_install, "lib", target_os, "install/lib");
     emit_link_search(graphviz_install, "lib64", target_os);
 
     // Plugins are built in the build directory, not installed
     let build_dir = graphviz_install.join("build");
-    emit_link_search(&build_dir, "plugin/dot_layout", target_os);
-    emit_link_search(&build_dir, "plugin/neato_layout", target_os);
-    emit_link_search(&build_dir, "plugin/core", target_os);
+    emit_link_search_debug(&build_dir, "plugin/dot_layout", target_os, "plugin/dot_layout");
+    emit_link_search_debug(&build_dir, "plugin/neato_layout", target_os, "plugin/neato_layout");
+    emit_link_search_debug(&build_dir, "plugin/core", target_os, "plugin/core");
     emit_link_search(&build_dir, "plugin/pango", target_os);
     emit_link_search(&build_dir, "plugin/quartz", target_os);
     emit_link_search(&build_dir, "plugin/kitty", target_os);
@@ -750,15 +765,15 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     emit_link_search(&build_dir, "lib/ast", target_os);
     emit_link_search(&build_dir, "lib/expr", target_os);
     emit_link_search(&build_dir, "lib/util", target_os);
-    // Core libraries
-    emit_link_search(&build_dir, "lib/cgraph", target_os);
+    // Core libraries - use debug versions for key paths
+    emit_link_search_debug(&build_dir, "lib/cgraph", target_os, "lib/cgraph");
     emit_link_search(&build_dir, "lib/cdt", target_os);
-    emit_link_search(&build_dir, "lib/gvc", target_os);
+    emit_link_search_debug(&build_dir, "lib/gvc", target_os, "lib/gvc");
     emit_link_search(&build_dir, "lib/pathplan", target_os);
     emit_link_search(&build_dir, "lib/xdot", target_os);
 
     // Expat directories
-    emit_link_search(expat_install, "lib", target_os);
+    emit_link_search_debug(expat_install, "lib", target_os, "expat/lib");
     emit_link_search(expat_install, "lib64", target_os);
 
     // Link Graphviz libraries
