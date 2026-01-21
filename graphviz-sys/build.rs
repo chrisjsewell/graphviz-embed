@@ -437,6 +437,26 @@ fn build_expat(
         .define("CMAKE_POSITION_INDEPENDENT_CODE", "ON")
         .out_dir(out_dir.join("expat-build"));
 
+    // Match Rust's CRT setting:
+    // - When Rust uses static CRT (+crt-static), use /MT
+    // - When Rust uses dynamic CRT (default), use /MD
+    // NOTE: Rust ALWAYS uses release CRT, even in debug builds. The debug CRT
+    // variants (/MTd, /MDd) are never used by Rust's standard library.
+    if target.contains("msvc") {
+        let use_static_crt = is_static_crt();
+        let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
+
+        // Force Release build type. This is critical because:
+        // 1. Rust always uses release CRT, so we must match with Release config
+        // 2. Expat's library naming includes 'd' suffix for Debug (libexpatdMD.lib)
+        //    but we need the Release name (libexpatMD.lib)
+        config.profile("Release");
+
+        // Use cflag() to add compiler flags directly - this is more reliable than
+        // CMAKE_MSVC_RUNTIME_LIBRARY or EXPAT_MSVC_STATIC_CRT which can be overridden
+        config.cflag(crt_flag);
+    }
+
     configure_cmake_for_target(&mut config, target, target_os, target_arch, host);
 
     config.build()
@@ -460,7 +480,7 @@ fn build_graphviz(
         // Disable CLI tools - we only want the library
         .define("GRAPHVIZ_CLI", "OFF")
         // Disable plugin loading - we'll statically link plugins
-        .define("enable_ltdl", "OFF")
+        .define("ENABLE_LTDL", "OFF")
         // Point to our built expat
         .define("WITH_EXPAT", "ON")
         .define(
@@ -469,16 +489,52 @@ fn build_graphviz(
         )
         .define("EXPAT_LIBRARY", find_expat_lib(expat_install, target_os))
         // Disable optional features we don't need
-        .define("with_gvedit", "OFF")
-        .define("with_smyrna", "OFF")
-        .define("enable_tcl", "OFF")
-        .define("enable_swig", "OFF")
+        .define("WITH_GVEDIT", "OFF")
+        .define("WITH_SMYRNA", "OFF")
         .define("WITH_ZLIB", "OFF")
         // Disable features that require C++ (avoiding C++ stdlib issues)
         .define("with_ipsepcola", "OFF")
-        // Disable GTS (GNU Triangulated Surface) - requires glib
-        .define("WITH_GTS", "OFF")
+        // Disable all SWIG language bindings
+        .define("ENABLE_TCL", "OFF")
+        .define("ENABLE_SWIG", "OFF")
+        .define("ENABLE_SHARP", "OFF")
+        .define("ENABLE_D", "OFF")
+        .define("ENABLE_GO", "OFF")
+        .define("ENABLE_GUILE", "OFF")
+        .define("ENABLE_JAVA", "OFF")
+        .define("ENABLE_JAVASCRIPT", "OFF")
+        .define("ENABLE_LUA", "OFF")
+        .define("ENABLE_PERL", "OFF")
+        .define("ENABLE_PHP", "OFF")
+        .define("ENABLE_PYTHON", "OFF")
+        .define("ENABLE_R", "OFF")
+        .define("ENABLE_RUBY", "OFF")
         .out_dir(out_dir.join("graphviz-build"));
+
+    // On Windows, tell Graphviz that Expat is statically linked (not a DLL)
+    // This prevents __imp_XML_* symbol references
+    // Also set the MSVC runtime library to match Rust's CRT setting
+    if target_os == "windows" {
+        let use_static_crt = is_static_crt();
+
+        // Determine the correct CRT flag
+        // NOTE: Rust ALWAYS uses release CRT (/MT or /MD), even in debug builds.
+        // The debug CRT variants (/MTd, /MDd) are never used by Rust's standard library.
+        let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
+
+        // Force Release build type to match Rust's release CRT
+        config.profile("Release");
+
+        // Use cflag() to add compiler flags directly - this is more reliable than
+        // CMAKE_MSVC_RUNTIME_LIBRARY which can be overridden by project CMakeLists.txt
+        config.cflag(crt_flag);
+
+        // Tell Graphviz that Expat is statically linked (not a DLL).
+        // This is always needed because we build Expat with BUILD_SHARED_LIBS=OFF.
+        // Note: This is independent of the CRT setting (MT/MD) - XML_STATIC controls
+        // whether Expat functions use __declspec(dllimport) in their declarations.
+        config.cflag("/DXML_STATIC");
+    }
 
     // Cairo/Pango handling
     #[cfg(feature = "cairo")]
@@ -488,9 +544,13 @@ fn build_graphviz(
 
     #[cfg(not(feature = "cairo"))]
     {
-        config.define("with_gdk", "OFF");
-        config.define("with_rsvg", "OFF");
-        config.define("with_pangocairo", "OFF");
+        // Use CMAKE_DISABLE_FIND_PACKAGE_* to prevent CMake from finding these
+        // (standard CMake mechanism to skip find_package() calls)
+        config.define("CMAKE_DISABLE_FIND_PACKAGE_PANGOCAIRO", "TRUE");
+        config.define("CMAKE_DISABLE_FIND_PACKAGE_CAIRO", "TRUE");
+        config.define("CMAKE_DISABLE_FIND_PACKAGE_GD", "TRUE");
+        config.define("WITH_GDK", "OFF");
+        config.define("WITH_RSVG", "OFF");
     }
 
     configure_cmake_for_target(&mut config, target, target_os, target_arch, host);
@@ -507,9 +567,12 @@ fn configure_cmake_for_target(
 ) {
     match target_os {
         "windows" => {
-            if target.contains("msvc") {
-                config.static_crt(true);
-            }
+            // NOTE: Do NOT use cmake crate's static_crt() here for MSVC!
+            // The static_crt() method only adds /MT or /MD flags, but doesn't handle
+            // debug vs release (/MTd vs /MT, /MDd vs /MD). We rely on CMAKE_MSVC_RUNTIME_LIBRARY
+            // which is set in build_expat() and build_graphviz() with the correct debug/release
+            // and static/dynamic CRT settings.
+            let _ = target; // Suppress unused variable warning
         }
         "macos" => {
             let arch = if target_arch == "aarch64" {
@@ -532,16 +595,38 @@ fn configure_cmake_for_target(
     }
 }
 
+/// Determine if Rust is using static CRT
+/// This checks the CARGO_CFG_TARGET_FEATURE env var for "crt-static"
+fn is_static_crt() -> bool {
+    env::var("CARGO_CFG_TARGET_FEATURE")
+        .map(|features| features.split(',').any(|f| f == "crt-static"))
+        .unwrap_or(false)
+}
+
 fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
     let lib_dir = expat_install.join("lib");
 
+    // On Windows MSVC, expat library naming follows the pattern: libexpat[w][d][MD|MT].lib
+    // - [w] = unicode (we don't use this)
+    // - [d] = debug build (lowercase 'd') - NOT USED, Rust always uses release CRT
+    // - MD = dynamic CRT, MT = static CRT
+    //
+    // NOTE: Rust ALWAYS uses release CRT (/MT or /MD), even in debug builds.
+    // So we always build Expat without the 'd' debug suffix.
+    //
+    // Examples:
+    // - Dynamic CRT (default): libexpatMD.lib
+    // - Static CRT (+crt-static): libexpatMT.lib
     let lib_name = match target_os {
-        "windows" => "expat.lib",
-        _ => "libexpat.a",
+        "windows" => {
+            let crt_suffix = if is_static_crt() { "MT" } else { "MD" };
+            format!("libexpat{}.lib", crt_suffix)
+        }
+        _ => "libexpat.a".to_string(),
     };
 
     // Also check lib64 directory
-    let lib_path = lib_dir.join(lib_name);
+    let lib_path = lib_dir.join(&lib_name);
     if lib_path.exists() {
         return lib_path.to_str().unwrap().to_string();
     }
@@ -555,167 +640,218 @@ fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
     lib_path.to_str().unwrap().to_string()
 }
 
+/// Helper to emit link search paths, handling Windows MSVC which puts libs in Release/ subdirs
+/// Takes path components as a slice to avoid forward-slash issues on Windows
+fn emit_link_search(base_path: &Path, components: &[&str], target_os: &str) {
+    let mut path = base_path.to_path_buf();
+    for component in components {
+        path = path.join(component);
+    }
+    println!("cargo:rustc-link-search=native={}", path.display());
+
+    // On Windows MSVC, CMake puts libraries in Release/ or Debug/ subdirectories
+    // depending on the build profile. Add both to be safe.
+    if target_os == "windows" {
+        let release_path = path.join("Release");
+        let debug_path = path.join("Debug");
+        println!("cargo:rustc-link-search=native={}", release_path.display());
+        println!("cargo:rustc-link-search=native={}", debug_path.display());
+    }
+}
+
+// Debug helper functions - uncomment when troubleshooting linking issues
+
+/// Emit link search path with debug output
+#[allow(dead_code)]
+fn emit_link_search_debug(base_path: &Path, components: &[&str], target_os: &str) {
+    let mut path = base_path.to_path_buf();
+    for component in components {
+        path = path.join(component);
+    }
+    let label = components.join("/");
+    println!("cargo:warning=Link search [{}]: {}", label, path.display());
+    println!("cargo:rustc-link-search=native={}", path.display());
+
+    if target_os == "windows" {
+        let release_path = path.join("Release");
+        println!(
+            "cargo:warning=Link search [{}/Release]: {}",
+            label,
+            release_path.display()
+        );
+        println!("cargo:rustc-link-search=native={}", release_path.display());
+    }
+}
+
+/// Debug helper to list what library files exist in a directory
+/// Takes path components as a slice to avoid forward-slash issues on Windows
+#[allow(dead_code)]
+fn debug_list_libs(base_path: &Path, components: &[&str]) {
+    let mut dir = base_path.to_path_buf();
+    for component in components {
+        dir = dir.join(component);
+    }
+    let label = components.join("/");
+    println!("cargo:warning=Checking {}: {}", label, dir.display());
+    if dir.exists() {
+        if let Ok(entries) = fs::read_dir(&dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                if name.ends_with(".lib") || name.ends_with(".a") {
+                    println!("cargo:warning=  Found: {}", name);
+                }
+            }
+        }
+    } else {
+        println!("cargo:warning=  Directory does not exist!");
+    }
+}
+
 fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os: &str) {
+    // Uncomment when troubleshooting linking issues:
+    // Debug: List what libraries exist in Graphviz directories
+    // debug_list_libs(graphviz_install, &["lib"]);
+    // debug_list_libs(graphviz_install, &["build", "lib", "gvc"]);
+    // debug_list_libs(graphviz_install, &["build", "lib", "gvc", "Release"]);
+    // debug_list_libs(graphviz_install, &["build", "lib", "gvc", "Debug"]);
+    // debug_list_libs(graphviz_install, &["build", "lib", "cgraph"]);
+    // debug_list_libs(graphviz_install, &["build", "lib", "cgraph", "Release"]);
+    // debug_list_libs(graphviz_install, &["build", "lib", "cgraph", "Debug"]);
+    // debug_list_libs(graphviz_install, &["build", "plugin", "core"]);
+    // debug_list_libs(graphviz_install, &["build", "plugin", "core", "Release"]);
+    // debug_list_libs(graphviz_install, &["build", "plugin", "core", "Debug"]);
+    // Debug: List what libraries exist in Expat directories
+    // debug_list_libs(expat_install, &["lib"]);
+    // debug_list_libs(expat_install, &["lib", "Debug"]);
+    // debug_list_libs(expat_install, &["lib", "Release"]);
+
     // Add library search paths
-    // The main install directory
-    println!(
-        "cargo:rustc-link-search=native={}/lib",
-        graphviz_install.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib64",
-        graphviz_install.display()
-    );
+    // For debugging, replace emit_link_search with emit_link_search_debug below:
+    // emit_link_search_debug(graphviz_install, &["lib"], target_os);
+    emit_link_search(graphviz_install, &["lib"], target_os);
+    emit_link_search(graphviz_install, &["lib64"], target_os);
 
     // Plugins are built in the build directory, not installed
     let build_dir = graphviz_install.join("build");
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/dot_layout",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/neato_layout",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/core",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/pango",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/quartz",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/plugin/kitty",
-        build_dir.display()
-    );
+    // emit_link_search_debug(&build_dir, &["plugin", "dot_layout"], target_os);
+    // emit_link_search_debug(&build_dir, &["plugin", "neato_layout"], target_os);
+    // emit_link_search_debug(&build_dir, &["plugin", "core"], target_os);
+    emit_link_search(&build_dir, &["plugin", "dot_layout"], target_os);
+    emit_link_search(&build_dir, &["plugin", "neato_layout"], target_os);
+    emit_link_search(&build_dir, &["plugin", "core"], target_os);
+    emit_link_search(&build_dir, &["plugin", "pango"], target_os);
+    emit_link_search(&build_dir, &["plugin", "quartz"], target_os);
+    emit_link_search(&build_dir, &["plugin", "kitty"], target_os);
 
     // Some internal libraries are also in the build dir
-    println!(
-        "cargo:rustc-link-search=native={}/lib/dotgen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/neatogen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/fdpgen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/sfdpgen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/twopigen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/patchwork",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/circogen",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/osage",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/common",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/label",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/pack",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/ortho",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/rbtree",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/sparse",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/edgepaint",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/mingle",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/sfio",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/ast",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/expr",
-        build_dir.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib/util",
-        build_dir.display()
-    );
+    emit_link_search(&build_dir, &["lib", "dotgen"], target_os);
+    emit_link_search(&build_dir, &["lib", "neatogen"], target_os);
+    emit_link_search(&build_dir, &["lib", "fdpgen"], target_os);
+    emit_link_search(&build_dir, &["lib", "sfdpgen"], target_os);
+    emit_link_search(&build_dir, &["lib", "twopigen"], target_os);
+    emit_link_search(&build_dir, &["lib", "patchwork"], target_os);
+    emit_link_search(&build_dir, &["lib", "circogen"], target_os);
+    emit_link_search(&build_dir, &["lib", "osage"], target_os);
+    emit_link_search(&build_dir, &["lib", "common"], target_os);
+    emit_link_search(&build_dir, &["lib", "label"], target_os);
+    emit_link_search(&build_dir, &["lib", "pack"], target_os);
+    emit_link_search(&build_dir, &["lib", "ortho"], target_os);
+    emit_link_search(&build_dir, &["lib", "rbtree"], target_os);
+    emit_link_search(&build_dir, &["lib", "sparse"], target_os);
+    emit_link_search(&build_dir, &["lib", "edgepaint"], target_os);
+    emit_link_search(&build_dir, &["lib", "mingle"], target_os);
+    emit_link_search(&build_dir, &["lib", "sfio"], target_os);
+    emit_link_search(&build_dir, &["lib", "ast"], target_os);
+    emit_link_search(&build_dir, &["lib", "expr"], target_os);
+    emit_link_search(&build_dir, &["lib", "util"], target_os);
+    // Core libraries
+    // emit_link_search_debug(&build_dir, &["lib", "cgraph"], target_os);
+    // emit_link_search_debug(&build_dir, &["lib", "gvc"], target_os);
+    emit_link_search(&build_dir, &["lib", "cgraph"], target_os);
+    emit_link_search(&build_dir, &["lib", "cdt"], target_os);
+    emit_link_search(&build_dir, &["lib", "gvc"], target_os);
+    emit_link_search(&build_dir, &["lib", "pathplan"], target_os);
+    emit_link_search(&build_dir, &["lib", "xdot"], target_os);
 
     // Expat directories
-    println!(
-        "cargo:rustc-link-search=native={}/lib",
-        expat_install.display()
-    );
-    println!(
-        "cargo:rustc-link-search=native={}/lib64",
-        expat_install.display()
-    );
+    // emit_link_search_debug(expat_install, &["lib"], target_os);
+    emit_link_search(expat_install, &["lib"], target_os);
+    emit_link_search(expat_install, &["lib64"], target_os);
 
     // Link Graphviz libraries
-    // List libraries in reverse dependency order (dependencies last)
+    // IMPORTANT: Libraries must be listed so that dependencies come AFTER dependents.
+    // On MSVC, the linker resolves symbols left-to-right, looking in later libraries.
+    // So if A depends on B, order should be: A then B.
 
-    println!("cargo:rustc-link-lib=static=expat");
-    println!("cargo:rustc-link-lib=static=util");
-    println!("cargo:rustc-link-lib=static=ast");
-    println!("cargo:rustc-link-lib=static=sfio");
-    println!("cargo:rustc-link-lib=static=cdt");
-    println!("cargo:rustc-link-lib=static=cgraph");
-    println!("cargo:rustc-link-lib=static=pathplan");
-    println!("cargo:rustc-link-lib=static=xdot");
-    println!("cargo:rustc-link-lib=static=common");
-    println!("cargo:rustc-link-lib=static=label");
-    println!("cargo:rustc-link-lib=static=pack");
-    println!("cargo:rustc-link-lib=static=ortho");
-    println!("cargo:rustc-link-lib=static=rbtree");
-    println!("cargo:rustc-link-lib=static=sparse");
-    println!("cargo:rustc-link-lib=static=expr");
-    println!("cargo:rustc-link-lib=static=dotgen");
-    println!("cargo:rustc-link-lib=static=neatogen");
-    println!("cargo:rustc-link-lib=static=fdpgen");
-    println!("cargo:rustc-link-lib=static=sfdpgen");
-    println!("cargo:rustc-link-lib=static=twopigen");
-    println!("cargo:rustc-link-lib=static=patchwork");
-    println!("cargo:rustc-link-lib=static=circogen");
-    println!("cargo:rustc-link-lib=static=osage");
-    println!("cargo:rustc-link-lib=static=gvc");
-    println!("cargo:rustc-link-lib=static=gvplugin_core");
-    println!("cargo:rustc-link-lib=static=gvplugin_dot_layout");
-    println!("cargo:rustc-link-lib=static=gvplugin_neato_layout");
+    // Helper to link a library with platform-appropriate naming
+    // On Windows MSVC, CMake produces XXX.lib files (no lib prefix)
+    // On Unix, CMake produces libXXX.a files
+    //
+    // We use -bundle to prevent bundling into the rlib, instead letting the linker
+    // find them at final link time. This is more reliable on Windows where library
+    // bundling can fail silently.
+    let link_lib = |name: &str| {
+        // Use -bundle on Windows to defer linking to final link step
+        if target_os == "windows" {
+            println!("cargo:rustc-link-lib=static:-bundle={}", name);
+        } else {
+            println!("cargo:rustc-link-lib=static={}", name);
+        }
+    };
+
+    // 1. Plugins (depend on gvc, layout engines, core libs)
+    link_lib("gvplugin_neato_layout");
+    link_lib("gvplugin_dot_layout");
+    link_lib("gvplugin_core");
+
+    // 2. GVC (depends on cgraph, common, plugins infrastructure)
+    link_lib("gvc");
+
+    // 3. Layout engines (depend on common, cgraph, pathplan, etc.)
+    link_lib("osage");
+    link_lib("circogen");
+    link_lib("patchwork");
+    link_lib("twopigen");
+    link_lib("sfdpgen");
+    link_lib("fdpgen");
+    link_lib("neatogen");
+    link_lib("dotgen");
+
+    // 4. Mid-level libraries (depend on cgraph, cdt, etc.)
+    link_lib("expr");
+    link_lib("sparse");
+    link_lib("rbtree");
+    link_lib("ortho");
+    link_lib("pack");
+    link_lib("label");
+    link_lib("common");
+    link_lib("xdot");
+    link_lib("pathplan");
+    link_lib("cgraph");
+    link_lib("cdt");
+
+    // 5. Low-level utility libraries
+    link_lib("sfio");
+    link_lib("ast");
+    link_lib("util");
+
+    // 6. External dependencies (lowest level)
+    // On Windows MSVC, expat library naming follows the pattern: libexpat[w][d][MD|MT].lib
+    // - [w] = unicode (we don't use this)
+    // - [d] = debug build (lowercase 'd')
+    // - MD = dynamic CRT, MT = static CRT
+    // We match Rust's CRT setting (detected via CARGO_CFG_TARGET_FEATURE)
+    // NOTE: Rust ALWAYS uses release CRT, so no 'd' debug suffix needed.
+    // We use the :+verbatim modifier to specify the exact filename
+    match target_os {
+        "windows" => {
+            let crt_suffix = if is_static_crt() { "MT" } else { "MD" };
+            let expat_lib = format!("libexpat{}.lib", crt_suffix);
+            println!("cargo:rustc-link-lib=static:+verbatim={}", expat_lib);
+        }
+        _ => println!("cargo:rustc-link-lib=static=expat"),
+    }
 
     // Platform-specific system libraries
     match target_os {
