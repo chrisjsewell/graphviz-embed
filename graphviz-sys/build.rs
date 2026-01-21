@@ -629,12 +629,16 @@ fn debug_list_libs(dir: &Path, label: &str) {
 }
 
 fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os: &str) {
-    // Debug: List what libraries exist
-    debug_list_libs(&graphviz_install.join("lib"), "install/lib");
+    // Debug: List what libraries exist in Graphviz directories
+    debug_list_libs(&graphviz_install.join("lib"), "graphviz install/lib");
     debug_list_libs(&graphviz_install.join("build/lib/gvc"), "build/lib/gvc");
     debug_list_libs(
         &graphviz_install.join("build/lib/gvc/Release"),
         "build/lib/gvc/Release",
+    );
+    debug_list_libs(
+        &graphviz_install.join("build/lib/gvc/Debug"),
+        "build/lib/gvc/Debug",
     );
     debug_list_libs(
         &graphviz_install.join("build/lib/cgraph"),
@@ -645,6 +649,10 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
         "build/lib/cgraph/Release",
     );
     debug_list_libs(
+        &graphviz_install.join("build/lib/cgraph/Debug"),
+        "build/lib/cgraph/Debug",
+    );
+    debug_list_libs(
         &graphviz_install.join("build/plugin/core"),
         "build/plugin/core",
     );
@@ -652,6 +660,15 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
         &graphviz_install.join("build/plugin/core/Release"),
         "build/plugin/core/Release",
     );
+    debug_list_libs(
+        &graphviz_install.join("build/plugin/core/Debug"),
+        "build/plugin/core/Debug",
+    );
+
+    // Debug: List what libraries exist in Expat directories
+    debug_list_libs(&expat_install.join("lib"), "expat install/lib");
+    debug_list_libs(&expat_install.join("lib/Debug"), "expat install/lib/Debug");
+    debug_list_libs(&expat_install.join("lib/Release"), "expat install/lib/Release");
 
     // Add library search paths
     // The main install directory
