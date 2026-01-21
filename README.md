@@ -273,11 +273,53 @@ During development, several challenges were encountered that may be useful for c
 
 ### Windows
 
-- **MSVC**: Builds use dynamic CRT (`/MD`, `/MDd`) by default to match Rust's defaults
-- **Static CRT**: For standalone binaries without MSVC runtime dependencies, use:
+Windows (MSVC) builds require careful handling of the C Runtime Library (CRT) and library linking. The build script addresses several platform-specific challenges:
+
+#### C Runtime Library (CRT) Matching
+
+**Problem**: Rust always uses release CRT (`/MD` or `/MT`), even in debug builds. However, CMake defaults to debug CRT (`/MDd`/`/MTd`) for Debug configurations, causing linker errors like "MSVCRT.lib conflicts with LIBCMTD.lib".
+
+**Solution**: The build script:
+1. Forces CMake to use `Release` profile regardless of Cargo's debug/release mode
+2. Uses `cflag()` to directly set `/MD` (dynamic CRT) or `/MT` (static CRT) matching Rust's setting
+3. Detects Rust's CRT preference via `CARGO_CFG_TARGET_FEATURE` for `crt-static`
+
+#### Expat Library Naming
+
+**Problem**: Expat on Windows uses complex library naming: `libexpat[w][d][MD|MT].lib` where `d` indicates debug, and `MD`/`MT` indicates CRT type.
+
+**Solution**: The build script constructs the correct library name (`libexpatMD.lib` or `libexpatMT.lib`) based on Rust's CRT setting and uses `:+verbatim` in link directives to specify the exact filename.
+
+#### Static Library Linking
+
+**Problem**: Default Rust library bundling (`+bundle`) attempts to embed native static libraries into the rlib, but this can fail silently on Windows MSVC, resulting in "unresolved external symbol" errors at final link time.
+
+**Solution**: Use `-bundle` modifier for Windows (`cargo:rustc-link-lib=static:-bundle=<lib>`) to defer library linking to the final executable link step, where `LIBPATH` entries are properly used.
+
+#### Path Handling
+
+**Problem**: CMake on Windows places libraries in `Release/` or `Debug/` subdirectories, and path separators differ between platforms.
+
+**Solution**: The build script:
+1. Uses `Path::join()` with component arrays instead of forward-slash string literals
+2. Adds both `Release/` and `Debug/` subdirectories to library search paths
+3. Searches multiple potential library locations
+
+#### Static Expat Linkage
+
+**Problem**: When linking Expat statically, functions must not use `__declspec(dllimport)` declarations, or you get "unresolved external symbol __imp_XML_*" errors.
+
+**Solution**: Define `XML_STATIC` via compiler flags (`/DXML_STATIC`) when building Graphviz, telling Expat headers we're linking statically.
+
+#### Usage
+
+- **Dynamic CRT (default)**: Works out of the box
+- **Static CRT**: For standalone binaries without MSVC runtime dependencies:
+
   ```bash
   RUSTFLAGS='-C target-feature=+crt-static' cargo build --release
   ```
+
 - **MinGW**: Not currently tested; may require additional configuration
 - **Cairo**: Install via vcpkg: `vcpkg install cairo pango`
 - **vcpkg Integration**: Set `VCPKG_ROOT` environment variable
@@ -285,6 +327,7 @@ During development, several challenges were encountered that may be useful for c
 ### Cross-Compilation
 
 When cross-compiling (e.g., building Linux ARM64 from x86_64):
+
 1. Install target toolchain
 2. Build script auto-detects cross-compilation when `HOST != TARGET`
 3. Sets appropriate CMake cross-compilation variables
@@ -309,6 +352,7 @@ When cross-compiling (e.g., building Linux ARM64 from x86_64):
 
 ### Medium Term
 
+- [ ] Add Python bindings via PyO3 and Maturin
 - [ ] Add WebAssembly (WASM) support for browser-based rendering
 - [ ] Implement graph builder API for programmatic graph construction
 - [ ] Add async rendering support
