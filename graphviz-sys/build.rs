@@ -445,14 +445,17 @@ fn build_expat(
     if target.contains("msvc") {
         let use_static_crt = is_static_crt();
         let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
-        println!("cargo:warning=MSVC CRT: static={}, flag={}", use_static_crt, crt_flag);
-        
+        println!(
+            "cargo:warning=MSVC CRT: static={}, flag={}",
+            use_static_crt, crt_flag
+        );
+
         // Force Release build type. This is critical because:
         // 1. Rust always uses release CRT, so we must match with Release config
         // 2. Expat's library naming includes 'd' suffix for Debug (libexpatdMD.lib)
         //    but we need the Release name (libexpatMD.lib)
         config.profile("Release");
-        
+
         // Use cflag() to add compiler flags directly - this is more reliable than
         // CMAKE_MSVC_RUNTIME_LIBRARY or EXPAT_MSVC_STATIC_CRT which can be overridden
         config.cflag(crt_flag);
@@ -517,20 +520,20 @@ fn build_graphviz(
     // Also set the MSVC runtime library to match Rust's CRT setting
     if target_os == "windows" {
         let use_static_crt = is_static_crt();
-        
+
         // Determine the correct CRT flag
         // NOTE: Rust ALWAYS uses release CRT (/MT or /MD), even in debug builds.
         // The debug CRT variants (/MTd, /MDd) are never used by Rust's standard library.
         let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
         println!("cargo:warning=Setting MSVC CRT flag: {}", crt_flag);
-        
+
         // Force Release build type to match Rust's release CRT
         config.profile("Release");
-        
+
         // Use cflag() to add compiler flags directly - this is more reliable than
         // CMAKE_MSVC_RUNTIME_LIBRARY which can be overridden by project CMakeLists.txt
         config.cflag(crt_flag);
-        
+
         // Tell Graphviz that Expat is statically linked (not a DLL).
         // This is always needed because we build Expat with BUILD_SHARED_LIBS=OFF.
         // Note: This is independent of the CRT setting (MT/MD) - XML_STATIC controls
@@ -672,7 +675,11 @@ fn emit_link_search_debug(base_path: &Path, components: &[&str], target_os: &str
 
     if target_os == "windows" {
         let release_path = path.join("Release");
-        println!("cargo:warning=Link search [{}]: {}", label, release_path.display());
+        println!(
+            "cargo:warning=Link search [{}]: {}",
+            label,
+            release_path.display()
+        );
         println!("cargo:rustc-link-search=native={}", release_path.display());
     }
 }
@@ -734,8 +741,14 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
 
     // Debug: List what libraries exist in Expat directories
     debug_list_libs(&expat_install.join("lib"), "expat install/lib");
-    debug_list_libs(&expat_install.join("lib").join("Debug"), "expat install/lib/Debug");
-    debug_list_libs(&expat_install.join("lib").join("Release"), "expat install/lib/Release");
+    debug_list_libs(
+        &expat_install.join("lib").join("Debug"),
+        "expat install/lib/Debug",
+    );
+    debug_list_libs(
+        &expat_install.join("lib").join("Release"),
+        "expat install/lib/Release",
+    );
 
     // Add library search paths
     // The main install directory
@@ -744,8 +757,18 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
 
     // Plugins are built in the build directory, not installed
     let build_dir = graphviz_install.join("build");
-    emit_link_search_debug(&build_dir, &["plugin", "dot_layout"], target_os, "plugin/dot_layout");
-    emit_link_search_debug(&build_dir, &["plugin", "neato_layout"], target_os, "plugin/neato_layout");
+    emit_link_search_debug(
+        &build_dir,
+        &["plugin", "dot_layout"],
+        target_os,
+        "plugin/dot_layout",
+    );
+    emit_link_search_debug(
+        &build_dir,
+        &["plugin", "neato_layout"],
+        target_os,
+        "plugin/neato_layout",
+    );
     emit_link_search_debug(&build_dir, &["plugin", "core"], target_os, "plugin/core");
     emit_link_search(&build_dir, &["plugin", "pango"], target_os);
     emit_link_search(&build_dir, &["plugin", "quartz"], target_os);
@@ -843,8 +866,11 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
         "windows" => {
             let crt_suffix = if is_static_crt() { "MT" } else { "MD" };
             let expat_lib = format!("libexpat{}.lib", crt_suffix);
-            println!("cargo:warning=Using expat library: {} (static_crt={})", 
-                     expat_lib, is_static_crt());
+            println!(
+                "cargo:warning=Using expat library: {} (static_crt={})",
+                expat_lib,
+                is_static_crt()
+            );
             println!("cargo:rustc-link-lib=static:+verbatim={}", expat_lib);
         }
         _ => println!("cargo:rustc-link-lib=static=expat"),
