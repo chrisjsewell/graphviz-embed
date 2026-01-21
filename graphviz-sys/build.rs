@@ -558,12 +558,27 @@ fn configure_cmake_for_target(
     }
 }
 
+/// Determine if we're building in debug or release profile
+fn is_debug_build() -> bool {
+    // The cmake crate follows Cargo's profile, so we need to check the profile
+    // OPT_LEVEL is "0" for debug, "1", "2", or "3" for release
+    env::var("OPT_LEVEL").map(|v| v == "0").unwrap_or(false)
+}
+
 fn find_expat_lib(expat_install: &Path, target_os: &str) -> String {
     let lib_dir = expat_install.join("lib");
 
-    // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON, the library is named libexpatMT.lib
+    // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON:
+    // - Release: libexpatMT.lib (MT = Multi-threaded static CRT)
+    // - Debug: libexpatMTD.lib (MTD = Multi-threaded Debug static CRT)
     let lib_name = match target_os {
-        "windows" => "libexpatMT.lib",
+        "windows" => {
+            if is_debug_build() {
+                "libexpatMTD.lib"
+            } else {
+                "libexpatMT.lib"
+            }
+        }
         _ => "libexpat.a",
     };
 
@@ -734,10 +749,20 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
 
     // 6. External dependencies (lowest level)
     // Expat library name differs on Windows with static CRT
-    // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON, the library is named libexpatMT.lib
+    // On Windows MSVC with EXPAT_MSVC_STATIC_CRT=ON:
+    // - Release: libexpatMT.lib (MT = Multi-threaded static CRT)
+    // - Debug: libexpatMTD.lib (MTD = Multi-threaded Debug static CRT)
     // We use the :+verbatim modifier to specify the exact filename
     match target_os {
-        "windows" => println!("cargo:rustc-link-lib=static:+verbatim=libexpatMT.lib"),
+        "windows" => {
+            let expat_lib = if is_debug_build() {
+                "libexpatMTD.lib"
+            } else {
+                "libexpatMT.lib"
+            };
+            println!("cargo:warning=Using expat library: {}", expat_lib);
+            println!("cargo:rustc-link-lib=static:+verbatim={}", expat_lib);
+        }
         _ => println!("cargo:rustc-link-lib=static=expat"),
     }
 
