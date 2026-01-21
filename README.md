@@ -74,7 +74,7 @@ graphviz-embed = { version = "0.1", features = ["cairo"] }
 ```
 
 > **Note:** The `cairo` feature requires Cairo and Pango libraries installed on your system:
-
+>
 > - **Linux**: `apt install libcairo2-dev libpango1.0-dev`
 > - **macOS**: `brew install cairo pango`
 > - **Windows**: Install via vcpkg (`vcpkg install cairo pango`)
@@ -122,39 +122,39 @@ fn main() -> Result<(), graphviz_embed::Error> {
 
 ## Layout Engines
 
-| Layout | Description | Best For |
-|--------|-------------|----------|
-| `Dot` | Hierarchical layout | Directed graphs, flowcharts |
-| `Neato` | Spring model layout | Undirected graphs, small networks |
-| `Fdp` | Force-directed placement | Larger undirected graphs |
-| `Sfdp` | Scalable force-directed | Very large graphs |
-| `Circo` | Circular layout | Cyclic structures |
-| `Twopi` | Radial layout | Trees, hierarchies |
-| `Osage` | Clustered layout | Grouped components |
-| `Patchwork` | Treemap layout | Hierarchical data visualization |
+|   Layout    |       Description        |             Best For              |
+| ----------- | ------------------------ | --------------------------------- |
+| `Dot`       | Hierarchical layout      | Directed graphs, flowcharts       |
+| `Neato`     | Spring model layout      | Undirected graphs, small networks |
+| `Fdp`       | Force-directed placement | Larger undirected graphs          |
+| `Sfdp`      | Scalable force-directed  | Very large graphs                 |
+| `Circo`     | Circular layout          | Cyclic structures                 |
+| `Twopi`     | Radial layout            | Trees, hierarchies                |
+| `Osage`     | Clustered layout         | Grouped components                |
+| `Patchwork` | Treemap layout           | Hierarchical data visualization   |
 
 ## Output Formats
 
 ### Always Available
 
-| Format | Description |
-|--------|-------------|
-| `Svg` | SVG vector graphics |
-| `Dot` | DOT with layout info |
-| `Xdot` | Extended DOT format |
-| `Json` | JSON output |
-| `Plain` | Plain text coordinates |
-| `PlainExt` | Extended plain text |
-| `Canon` | Canonical DOT |
+|   Format   |      Description       |
+| ---------- | ---------------------- |
+| `Svg`      | SVG vector graphics    |
+| `Dot`      | DOT with layout info   |
+| `Xdot`     | Extended DOT format    |
+| `Json`     | JSON output            |
+| `Plain`    | Plain text coordinates |
+| `PlainExt` | Extended plain text    |
+| `Canon`    | Canonical DOT          |
 
 ### With `cairo` Feature
 
-| Format | Description |
-|--------|-------------|
-| `Png` | PNG raster image |
-| `Pdf` | PDF document |
-| `Ps` | PostScript |
-| `Eps` | Encapsulated PostScript |
+| Format |       Description       |
+| ------ | ----------------------- |
+| `Png`  | PNG raster image        |
+| `Pdf`  | PDF document            |
+| `Ps`   | PostScript              |
+| `Eps`  | Encapsulated PostScript |
 
 ## HTML Labels
 
@@ -183,13 +183,13 @@ let svg = ctx.render(dot, Layout::Dot, Format::Svg).unwrap();
 
 ## Supported Platforms
 
-| Platform | Architecture | Status |
-|----------|--------------|--------|
-| Linux | x86_64 | ✅ |
-| Linux | aarch64 | ✅ |
-| macOS | x86_64 (Intel) | ✅ |
-| macOS | aarch64 (Apple Silicon) | ✅ |
-| Windows | x86_64 (MSVC) | ✅ |
+| Platform |      Architecture       | Status |
+| -------- | ----------------------- | ------ |
+| Linux    | x86_64                  | ✅     |
+| Linux    | aarch64                 | ✅     |
+| macOS    | x86_64 (Intel)          | ✅     |
+| macOS    | aarch64 (Apple Silicon) | ✅     |
+| Windows  | x86_64 (MSVC)           | ✅     |
 
 ## Design Considerations
 
@@ -198,6 +198,7 @@ This crate was designed with several key goals in mind:
 ### Why Vendor Graphviz?
 
 Most existing Rust Graphviz crates either:
+
 1. Call the external `dot` command (requires system installation)
 2. Link to system Graphviz libraries (requires headers and libs)
 
@@ -244,6 +245,7 @@ During development, several challenges were encountered that may be useful for c
 **Problem**: Graphviz requires Bison ≥3.0 and Flex at build time to generate parsers for DOT syntax (`lib/cgraph`), HTML labels (`lib/common`), and expressions (`lib/expr`).
 
 **Solution**: Pre-generate parser files and patch CMakeLists.txt to use them instead of invoking Bison/Flex. The build script applies inline patches to:
+
 - Replace `BISON_TARGET()` and `FLEX_TARGET()` with static file references
 - Comment out `set_package_properties(BISON/FLEX PROPERTIES TYPE REQUIRED)`
 
@@ -252,6 +254,7 @@ During development, several challenges were encountered that may be useful for c
 **Problem**: Graphviz's CMake configuration has many optional dependencies (GTS, LTDL, etc.) that can cause build failures when not available.
 
 **Solution**: The build script patches CMakeLists.txt to:
+
 - Disable GTS (GNU Triangulated Surface) which requires glib
 - Disable LTDL (dynamic plugin loading) for static linking
 - Disable ipsepcola which requires C++ stdlib headers that may not be available in cross-compilation
@@ -260,7 +263,8 @@ During development, several challenges were encountered that may be useful for c
 
 **Problem**: Graphviz expects plugins to be loaded dynamically via ltdl. Static linking requires manual plugin registration.
 
-**Solution**: 
+**Solution**:
+
 - Build plugins as static libraries in specific build directories
 - Export plugin symbols (`gvplugin_*_LTX_library`) 
 - Register plugins programmatically via `gvAddLibrary()` at initialization
@@ -271,6 +275,7 @@ During development, several challenges were encountered that may be useful for c
 **Problem**: The Graphviz C library uses global state and is not thread-safe. Running tests in parallel caused SIGSEGV crashes.
 
 **Solution**: Implement a global mutex (`GRAPHVIZ_MUTEX`) that serializes all Graphviz operations:
+
 - Context creation
 - Graph parsing and rendering  
 - Context destruction
@@ -280,6 +285,7 @@ During development, several challenges were encountered that may be useful for c
 **Problem**: CMake places built libraries in various subdirectories, and library names can differ between platforms.
 
 **Solution**: The build script searches multiple paths:
+
 - `lib/` and `lib64/` in install directory
 - `build/plugin/{dot_layout,neato_layout,core}/` for plugins
 - `build/lib/{dotgen,neatogen,fdpgen,...}/` for internal libraries
@@ -308,6 +314,7 @@ Windows (MSVC) builds require careful handling of the C Runtime Library (CRT) an
 **Problem**: Rust always uses release CRT (`/MD` or `/MT`), even in debug builds. However, CMake defaults to debug CRT (`/MDd`/`/MTd`) for Debug configurations, causing linker errors like "MSVCRT.lib conflicts with LIBCMTD.lib".
 
 **Solution**: The build script:
+
 1. Forces CMake to use `Release` profile regardless of Cargo's debug/release mode
 2. Uses `cflag()` to directly set `/MD` (dynamic CRT) or `/MT` (static CRT) matching Rust's setting
 3. Detects Rust's CRT preference via `CARGO_CFG_TARGET_FEATURE` for `crt-static`
@@ -329,6 +336,7 @@ Windows (MSVC) builds require careful handling of the C Runtime Library (CRT) an
 **Problem**: CMake on Windows places libraries in `Release/` or `Debug/` subdirectories, and path separators differ between platforms.
 
 **Solution**: The build script:
+
 1. Uses `Path::join()` with component arrays instead of forward-slash string literals
 2. Adds both `Release/` and `Debug/` subdirectories to library search paths
 3. Searches multiple potential library locations
@@ -459,11 +467,13 @@ Releases are automated via GitHub Actions. When a version tag is pushed, the CI 
 1. Update version in `Cargo.toml` (workspace version)
 2. Update `CHANGELOG.md` if applicable
 3. Commit the changes:
+
    ```bash
    git add -A
    git commit -m "Release v0.1.0"
    git push origin main
    ```
+
 4. Create a release on GitHub:
    - Go to **Releases → Draft a new release**
    - Create a new tag (e.g., `v0.1.0`)
@@ -471,12 +481,14 @@ Releases are automated via GitHub Actions. When a version tag is pushed, the CI 
    - Publish the release
 
 Alternatively, push a tag directly:
+
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
 The CI will automatically:
+
 - Run all tests on all platforms
 - Verify the tag version matches `Cargo.toml`
 - Prepare vendored sources for publishing
