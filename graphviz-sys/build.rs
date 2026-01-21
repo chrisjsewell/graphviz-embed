@@ -13,24 +13,56 @@ use std::path::{Path, PathBuf};
 fn main() {
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let workspace_dir = manifest_dir.parent().unwrap();
 
     let target = env::var("TARGET").unwrap();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
     let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let host = env::var("HOST").unwrap();
 
-    // Paths to vendored sources
-    let graphviz_src = workspace_dir.join("vendor/graphviz");
-    let expat_src = workspace_dir.join("vendor/expat/expat");
-    let generated_dir = workspace_dir.join("generated");
-    let patches_dir = workspace_dir.join("patches");
+    // Detect whether we're building from workspace (development) or standalone (crates.io)
+    // In workspace: sources are in ../vendor/, ../generated/, ../patches/
+    // Standalone: sources are in ./vendor/, ./generated/, ./patches/ within the crate
+    let (graphviz_src, expat_src, generated_dir, patches_dir) = {
+        let workspace_dir = manifest_dir.parent();
+        
+        // Check if we're in a workspace with sources at the workspace level
+        if let Some(ws) = workspace_dir {
+            let ws_graphviz = ws.join("vendor").join("graphviz");
+            if ws_graphviz.join("CMakeLists.txt").exists() {
+                // Building from workspace (git submodules)
+                // Note: expat submodule has nested structure: vendor/expat/expat/
+                (
+                    ws_graphviz,
+                    ws.join("vendor").join("expat").join("expat"),
+                    ws.join("generated"),
+                    ws.join("patches"),
+                )
+            } else {
+                // Standalone crate (crates.io install)
+                // Note: prepare-publish.sh flattens expat to vendor/expat/
+                (
+                    manifest_dir.join("vendor").join("graphviz"),
+                    manifest_dir.join("vendor").join("expat"),
+                    manifest_dir.join("generated"),
+                    manifest_dir.join("patches"),
+                )
+            }
+        } else {
+            // No parent directory, must be standalone
+            (
+                manifest_dir.join("vendor").join("graphviz"),
+                manifest_dir.join("vendor").join("expat"),
+                manifest_dir.join("generated"),
+                manifest_dir.join("patches"),
+            )
+        }
+    };
 
-    // Check that submodules are initialized
+    // Check that vendored sources are present
     if !graphviz_src.join("CMakeLists.txt").exists() {
         panic!(
             "Graphviz source not found at {:?}. \
-             Please initialize git submodules with: \
+             If building from git, initialize submodules with: \
              git submodule update --init --recursive",
             graphviz_src
         );
@@ -39,7 +71,7 @@ fn main() {
     if !expat_src.join("CMakeLists.txt").exists() {
         panic!(
             "Expat source not found at {:?}. \
-             Please initialize git submodules with: \
+             If building from git, initialize submodules with: \
              git submodule update --init --recursive",
             expat_src
         );
@@ -89,10 +121,10 @@ fn main() {
 
     // Rerun if sources change
     println!("cargo:rerun-if-changed=build.rs");
-    println!("cargo:rerun-if-changed=../vendor/graphviz");
-    println!("cargo:rerun-if-changed=../vendor/expat");
-    println!("cargo:rerun-if-changed=../generated");
-    println!("cargo:rerun-if-changed=../patches");
+    println!("cargo:rerun-if-changed={}", graphviz_src.display());
+    println!("cargo:rerun-if-changed={}", expat_src.display());
+    println!("cargo:rerun-if-changed={}", generated_dir.display());
+    println!("cargo:rerun-if-changed={}", patches_dir.display());
 }
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
@@ -151,7 +183,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), std::io::Error> {
 fn copy_generated_files(generated_dir: &Path, graphviz_src: &Path) -> Result<(), std::io::Error> {
     // Copy cgraph generated files
     let cgraph_gen = generated_dir.join("cgraph");
-    let cgraph_dst = graphviz_src.join("lib/cgraph");
+    let cgraph_dst = graphviz_src.join("lib").join("cgraph");
     if cgraph_gen.exists() && cgraph_dst.exists() {
         for file in &["grammar.c", "grammar.h", "scan.c"] {
             let src = cgraph_gen.join(file);
@@ -163,7 +195,7 @@ fn copy_generated_files(generated_dir: &Path, graphviz_src: &Path) -> Result<(),
 
     // Copy common generated files
     let common_gen = generated_dir.join("common");
-    let common_dst = graphviz_src.join("lib/common");
+    let common_dst = graphviz_src.join("lib").join("common");
     if common_gen.exists() && common_dst.exists() {
         for file in &["htmlparse.c", "htmlparse.h"] {
             let src = common_gen.join(file);
@@ -175,7 +207,7 @@ fn copy_generated_files(generated_dir: &Path, graphviz_src: &Path) -> Result<(),
 
     // Copy expr generated files
     let expr_gen = generated_dir.join("expr");
-    let expr_dst = graphviz_src.join("lib/expr");
+    let expr_dst = graphviz_src.join("lib").join("expr");
     if expr_gen.exists() && expr_dst.exists() {
         for file in &["exparse.c", "exparse.h"] {
             let src = expr_gen.join(file);
@@ -201,7 +233,7 @@ fn apply_patches(_patches_dir: &Path, graphviz_src: &Path) {
     }
 
     // Patch cgraph/CMakeLists.txt
-    let cgraph_cmake = graphviz_src.join("lib/cgraph/CMakeLists.txt");
+    let cgraph_cmake = graphviz_src.join("lib").join("cgraph").join("CMakeLists.txt");
     if cgraph_cmake.exists() {
         let content = fs::read_to_string(&cgraph_cmake).unwrap();
         let patched = patch_cgraph_cmake(&content);
@@ -209,7 +241,7 @@ fn apply_patches(_patches_dir: &Path, graphviz_src: &Path) {
     }
 
     // Patch common/CMakeLists.txt
-    let common_cmake = graphviz_src.join("lib/common/CMakeLists.txt");
+    let common_cmake = graphviz_src.join("lib").join("common").join("CMakeLists.txt");
     if common_cmake.exists() {
         let content = fs::read_to_string(&common_cmake).unwrap();
         let patched = patch_common_cmake(&content);
@@ -217,7 +249,7 @@ fn apply_patches(_patches_dir: &Path, graphviz_src: &Path) {
     }
 
     // Patch expr/CMakeLists.txt
-    let expr_cmake = graphviz_src.join("lib/expr/CMakeLists.txt");
+    let expr_cmake = graphviz_src.join("lib").join("expr").join("CMakeLists.txt");
     if expr_cmake.exists() {
         let content = fs::read_to_string(&expr_cmake).unwrap();
         let patched = patch_expr_cmake(&content);

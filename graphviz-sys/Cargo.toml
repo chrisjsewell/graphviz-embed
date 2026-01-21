@@ -25,3 +25,13 @@ vcpkg = "0.2"
 
 [dependencies]
 libc = "0.2"
+
+# Include vendored sources in the published crate
+# These are large (~50MB) but necessary for standalone builds
+[package.metadata.docs.rs]
+features = ["cairo"]
+
+# Files to include when publishing to crates.io
+# In development, vendor/ contains git submodules; for publishing,
+# the sources must be copied into the crate directory
+# See scripts/prepare-publish.sh for the publishing workflow

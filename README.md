@@ -21,11 +21,11 @@ This crate provides a safe Rust API to render DOT graphs using a fully embedded 
 
 ### Build-time
 
-| Dependency | Required | Notes |
-|------------|----------|-------|
-| Rust 1.70+ | ✅ | Edition 2021 |
-| CMake 3.16+ | ✅ | Builds vendored C libraries |
-| C compiler | ✅ | GCC, Clang, or MSVC |
+| Dependency  | Required |            Notes            |
+| ----------- | -------- | --------------------------- |
+| Rust 1.70+  | ✅       | Edition 2021                |
+| CMake 3.16+ | ✅       | Builds vendored C libraries |
+| C compiler  | ✅       | GCC, Clang, or MSVC         |
 
 ```bash
 # Linux (Debian/Ubuntu)
@@ -41,7 +41,15 @@ brew install cmake
 
 ### Runtime
 
-**None!** All libraries are statically linked into your binary.
+**Default (no `cairo` feature):** None! Graphviz and Expat are statically linked into your binary.
+
+**With `cairo` feature:** Requires Cairo and Pango shared libraries at runtime (`libcairo`, `libpango`, etc.). These are dynamically linked because statically linking Cairo's many dependencies is impractical. Most systems that have the `-dev` packages installed will also have the runtime libraries.
+
+**Windows note:** By default, Rust links the MSVC C runtime dynamically, so `vcruntime*.dll` must be present (included with Windows or Visual C++ Redistributable). For fully standalone binaries, use static CRT:
+
+```bash
+RUSTFLAGS='-C target-feature=+crt-static' cargo build --release
+```
 
 ## Installation
 
@@ -60,9 +68,23 @@ graphviz-embed = { version = "0.1", features = ["cairo"] }
 ```
 
 > **Note:** The `cairo` feature requires Cairo and Pango libraries installed on your system:
+
 > - **Linux**: `apt install libcairo2-dev libpango1.0-dev`
 > - **macOS**: `brew install cairo pango`
 > - **Windows**: Install via vcpkg (`vcpkg install cairo pango`)
+
+### How the Build Works
+
+When you add `graphviz-embed` as a dependency, the first build will:
+
+1. **Download the crate** from crates.io (~30-50MB due to vendored C sources)
+2. **Build Expat** — XML parsing library for HTML labels (via CMake)
+3. **Build Graphviz** — the core graph layout library (via CMake)
+4. **Statically link** everything into your binary
+
+This happens automatically via Cargo's build script system. The initial build takes 2-5 minutes depending on your machine, but subsequent builds are cached. The vendored C sources are compiled once and reused.
+
+**Build output location**: The compiled libraries are stored in your `target/` directory under `target/<profile>/build/graphviz-sys-*/out/`.
 
 ## Quick Start
 
@@ -451,8 +473,30 @@ git push origin v0.1.0
 The CI will automatically:
 - Run all tests on all platforms
 - Verify the tag version matches `Cargo.toml`
+- Prepare vendored sources for publishing
 - Publish `graphviz-sys` to crates.io
 - Publish `graphviz-embed` to crates.io
+
+### Manual Publishing
+
+For manual publishing (not recommended), the vendored C sources must be copied into the `graphviz-sys` crate:
+
+```bash
+# Copy vendored sources into the crate
+./scripts/prepare-publish.sh
+
+# Test the package
+cargo publish --dry-run -p graphviz-sys
+
+# Publish (in order - sys first, then embed)
+cargo publish -p graphviz-sys
+cargo publish -p graphviz-embed
+
+# Clean up copied sources
+./scripts/cleanup-publish.sh
+```
+
+> **Note:** The `graphviz-sys` crate is large (~30-50MB) due to vendored C sources.
 
 ## Acknowledgments
 

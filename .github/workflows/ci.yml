@@ -285,6 +285,11 @@ jobs:
           fi
           echo "Version verified: $TAG_VERSION"
 
+      # Prepare vendored sources for publishing
+      # This copies the git submodule contents into the crate directory
+      - name: Prepare vendored sources
+        run: ./scripts/prepare-publish.sh
+
       # Publish graphviz-sys first (it's a dependency)
       - name: Publish graphviz-sys
         run: cargo publish -p graphviz-sys --token ${{ secrets.CRATES_IO_TOKEN }}
