@@ -43,9 +43,15 @@ brew install cmake
 
 **Default (no `cairo` feature):** None! Graphviz and Expat are statically linked into your binary.
 
-**With `cairo` feature:** Requires Cairo and Pango shared libraries at runtime (`libcairo`, `libpango`, etc.). These are dynamically linked because statically linking Cairo's many dependencies is impractical. Most systems that have the `-dev` packages installed will also have the runtime libraries.
+**With `cairo` feature:** Requires Cairo and Pango shared libraries at runtime. These are dynamically linked because statically linking Cairo's many transitive dependencies is impractical.
 
-**Windows note:** By default, Rust links the MSVC C runtime dynamically, so `vcruntime*.dll` must be present (included with Windows or Visual C++ Redistributable). For fully standalone binaries, use static CRT:
+| Platform | Runtime libraries needed |
+| -------- | ----------------------- |
+| **Linux** | `libcairo.so`, `libpango-1.0.so` — install with `apt install libcairo2 libpango-1.0-0` (Debian/Ubuntu) or equivalent |
+| **macOS** | Bundled with Homebrew install: `brew install cairo pango` |
+| **Windows** | Cairo/Pango DLLs must be in PATH or alongside your executable |
+
+**Windows CRT note:** By default, Rust links the MSVC C runtime dynamically, so `vcruntime*.dll` must be present (included with Windows or Visual C++ Redistributable). For fully standalone binaries, use static CRT:
 
 ```bash
 RUSTFLAGS='-C target-feature=+crt-static' cargo build --release
