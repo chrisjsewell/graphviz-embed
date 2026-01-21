@@ -447,6 +447,12 @@ fn build_expat(
         let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
         println!("cargo:warning=MSVC CRT: static={}, flag={}", use_static_crt, crt_flag);
         
+        // Force Release build type. This is critical because:
+        // 1. Rust always uses release CRT, so we must match with Release config
+        // 2. Expat's library naming includes 'd' suffix for Debug (libexpatdMD.lib)
+        //    but we need the Release name (libexpatMD.lib)
+        config.profile("Release");
+        
         // Use cflag() to add compiler flags directly - this is more reliable than
         // CMAKE_MSVC_RUNTIME_LIBRARY or EXPAT_MSVC_STATIC_CRT which can be overridden
         config.cflag(crt_flag);
@@ -517,6 +523,9 @@ fn build_graphviz(
         // The debug CRT variants (/MTd, /MDd) are never used by Rust's standard library.
         let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
         println!("cargo:warning=Setting MSVC CRT flag: {}", crt_flag);
+        
+        // Force Release build type to match Rust's release CRT
+        config.profile("Release");
         
         // Use cflag() to add compiler flags directly - this is more reliable than
         // CMAKE_MSVC_RUNTIME_LIBRARY which can be overridden by project CMakeLists.txt
