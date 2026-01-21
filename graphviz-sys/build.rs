@@ -574,7 +574,9 @@ fn configure_cmake_for_target(
     match target_os {
         "windows" => {
             if target.contains("msvc") {
-                config.static_crt(true);
+                // Use cmake crate's static_crt() method to match Rust's CRT setting
+                // This properly sets compiler flags for the chosen runtime library
+                config.static_crt(is_static_crt());
             }
         }
         "macos" => {
