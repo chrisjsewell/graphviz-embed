@@ -438,8 +438,8 @@ fn build_expat(
         .out_dir(out_dir.join("expat-build"));
 
     // Match Rust's CRT setting:
-    // - When Rust uses static CRT (+crt-static), use EXPAT_MSVC_STATIC_CRT=ON -> /MT or /MTd
-    // - When Rust uses dynamic CRT (default), use EXPAT_MSVC_STATIC_CRT=OFF -> /MD or /MDd
+    // - When Rust uses static CRT (+crt-static), use /MT or /MTd
+    // - When Rust uses dynamic CRT (default), use /MD or /MDd
     if target.contains("msvc") {
         let use_static_crt = is_static_crt();
         let is_debug = is_debug_build();
@@ -451,18 +451,18 @@ fn build_expat(
             config.profile("Debug");
         }
         
-        if use_static_crt {
-            config.define("EXPAT_MSVC_STATIC_CRT", "ON");
-        }
-        
-        // Also set CMAKE_MSVC_RUNTIME_LIBRARY for CMake 3.15+ compatibility
-        let msvc_runtime = if use_static_crt {
-            if is_debug { "MultiThreadedDebug" } else { "MultiThreaded" }
+        // Determine the correct CRT flag
+        // /MT = static release, /MTd = static debug
+        // /MD = dynamic release, /MDd = dynamic debug
+        let crt_flag = if use_static_crt {
+            if is_debug { "/MTd" } else { "/MT" }
         } else {
-            if is_debug { "MultiThreadedDebugDLL" } else { "MultiThreadedDLL" }
+            if is_debug { "/MDd" } else { "/MD" }
         };
-        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", msvc_runtime);
-        config.define("CMAKE_POLICY_DEFAULT_CMP0091", "NEW");
+        
+        // Use cflag() to add compiler flags directly - this is more reliable than
+        // CMAKE_MSVC_RUNTIME_LIBRARY or EXPAT_MSVC_STATIC_CRT which can be overridden
+        config.cflag(crt_flag);
     }
 
     configure_cmake_for_target(&mut config, target, target_os, target_arch, host);
@@ -524,6 +524,7 @@ fn build_graphviz(
     // Also set the MSVC runtime library to match Rust's CRT setting
     if target_os == "windows" {
         let is_debug = is_debug_build();
+        let use_static_crt = is_static_crt();
         
         // Set CMake build type to match Rust's profile
         // This is critical: cmake crate defaults to Release, but we need Debug for debug builds
@@ -531,29 +532,22 @@ fn build_graphviz(
             config.profile("Debug");
         }
         
-        // Set the MSVC runtime library to match Rust's CRT
-        // CMake 3.15+ supports CMAKE_MSVC_RUNTIME_LIBRARY
-        let msvc_runtime = if is_static_crt() {
-            if is_debug {
-                "MultiThreadedDebug"      // /MTd
-            } else {
-                "MultiThreaded"           // /MT
-            }
+        // Determine the correct CRT flag
+        // /MT = static release, /MTd = static debug
+        // /MD = dynamic release, /MDd = dynamic debug
+        let crt_flag = if use_static_crt {
+            if is_debug { "/MTd" } else { "/MT" }
         } else {
-            if is_debug {
-                "MultiThreadedDebugDLL"   // /MDd
-            } else {
-                "MultiThreadedDLL"        // /MD
-            }
+            if is_debug { "/MDd" } else { "/MD" }
         };
-        println!("cargo:warning=Setting CMAKE_MSVC_RUNTIME_LIBRARY={}", msvc_runtime);
-        config.define("CMAKE_MSVC_RUNTIME_LIBRARY", msvc_runtime);
+        println!("cargo:warning=Setting MSVC CRT flag: {}", crt_flag);
         
-        // Also need to set policy CMP0091 to NEW to use CMAKE_MSVC_RUNTIME_LIBRARY
-        config.define("CMAKE_POLICY_DEFAULT_CMP0091", "NEW");
+        // Use cflag() to add compiler flags directly - this is more reliable than
+        // CMAKE_MSVC_RUNTIME_LIBRARY which can be overridden by project CMakeLists.txt
+        config.cflag(crt_flag);
         
         // Tell Graphviz that Expat is statically linked (not a DLL)
-        config.define("CMAKE_C_FLAGS", "/DXML_STATIC");
+        config.cflag("/DXML_STATIC");
     }
 
     // Cairo/Pango handling
