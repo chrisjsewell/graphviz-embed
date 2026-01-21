@@ -6,6 +6,7 @@
 use graphviz_embed::{Format as RustFormat, GraphvizContext, Layout as RustLayout};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
+use pyo3::types::PyBytes;
 
 /// Python wrapper for the Graphviz context
 #[pyclass(name = "GraphvizContext")]
@@ -47,7 +48,7 @@ impl PyGraphvizContext {
     ///     >>> ctx = GraphvizContext()
     ///     >>> svg = ctx.render("digraph { a -> b }", "dot", "svg")
     ///     >>> print(svg.decode('utf-8'))
-    fn render<'py>(&self, py: Python<'py>, dot_source: &str, layout: &str, format: &str) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+    fn render<'py>(&self, py: Python<'py>, dot_source: &str, layout: &str, format: &str) -> PyResult<Bound<'py, PyBytes>> {
         let rust_layout = parse_layout(layout)?;
         let rust_format = parse_format(format)?;
 
@@ -55,7 +56,7 @@ impl PyGraphvizContext {
             .render(dot_source, rust_layout, rust_format)
             .map_err(|e| PyRuntimeError::new_err(format!("Rendering failed: {}", e)))?;
         
-        Ok(pyo3::types::PyBytes::new_bound(py, &output))
+        Ok(PyBytes::new_bound(py, &output))
     }
 
     /// Render a DOT graph and save to a file
@@ -161,7 +162,7 @@ fn parse_format(format: &str) -> PyResult<RustFormat> {
 ///     >>> print(svg.decode('utf-8'))
 #[pyfunction]
 #[pyo3(signature = (dot_source, layout="dot"))]
-fn render_svg<'py>(py: Python<'py>, dot_source: &str, layout: &str) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+fn render_svg<'py>(py: Python<'py>, dot_source: &str, layout: &str) -> PyResult<Bound<'py, PyBytes>> {
     let ctx = PyGraphvizContext::new()?;
     ctx.render(py, dot_source, layout, "svg")
 }
@@ -185,7 +186,7 @@ fn render_svg<'py>(py: Python<'py>, dot_source: &str, layout: &str) -> PyResult<
 ///     ...     f.write(png)
 #[pyfunction]
 #[pyo3(signature = (dot_source, layout="dot"))]
-fn render_png<'py>(py: Python<'py>, dot_source: &str, layout: &str) -> PyResult<Bound<'py, pyo3::types::PyBytes>> {
+fn render_png<'py>(py: Python<'py>, dot_source: &str, layout: &str) -> PyResult<Bound<'py, PyBytes>> {
     let ctx = PyGraphvizContext::new()?;
     ctx.render(py, dot_source, layout, "png")
 }
