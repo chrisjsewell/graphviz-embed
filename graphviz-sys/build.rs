@@ -587,13 +587,57 @@ fn emit_link_search(base_path: &Path, subdir: &str, target_os: &str) {
     let path = base_path.join(subdir);
     println!("cargo:rustc-link-search=native={}", path.display());
 
-    // On Windows MSVC, CMake puts libraries in Release/ (or Debug/) subdirectories
+    // On Windows MSVC, CMake puts libraries in Release/ or Debug/ subdirectories
+    // depending on the build profile. Add both to be safe.
     if target_os == "windows" {
         println!("cargo:rustc-link-search=native={}/Release", path.display());
+        println!("cargo:rustc-link-search=native={}/Debug", path.display());
+    }
+}
+
+/// Debug helper to list what library files exist in a directory
+fn debug_list_libs(dir: &Path, label: &str) {
+    println!("cargo:warning=Checking {}: {}", label, dir.display());
+    if dir.exists() {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let name = path.file_name().unwrap_or_default().to_string_lossy();
+                if name.ends_with(".lib") || name.ends_with(".a") {
+                    println!("cargo:warning=  Found: {}", name);
+                }
+            }
+        }
+    } else {
+        println!("cargo:warning=  Directory does not exist!");
     }
 }
 
 fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os: &str) {
+    // Debug: List what libraries exist
+    debug_list_libs(&graphviz_install.join("lib"), "install/lib");
+    debug_list_libs(&graphviz_install.join("build/lib/gvc"), "build/lib/gvc");
+    debug_list_libs(
+        &graphviz_install.join("build/lib/gvc/Release"),
+        "build/lib/gvc/Release",
+    );
+    debug_list_libs(
+        &graphviz_install.join("build/lib/cgraph"),
+        "build/lib/cgraph",
+    );
+    debug_list_libs(
+        &graphviz_install.join("build/lib/cgraph/Release"),
+        "build/lib/cgraph/Release",
+    );
+    debug_list_libs(
+        &graphviz_install.join("build/plugin/core"),
+        "build/plugin/core",
+    );
+    debug_list_libs(
+        &graphviz_install.join("build/plugin/core/Release"),
+        "build/plugin/core/Release",
+    );
+
     // Add library search paths
     // The main install directory
     emit_link_search(graphviz_install, "lib", target_os);
@@ -645,41 +689,48 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // On MSVC, the linker resolves symbols left-to-right, looking in later libraries.
     // So if A depends on B, order should be: A then B.
 
+    // Helper to link a library with platform-appropriate naming
+    // On Windows MSVC, CMake produces XXX.lib files (no lib prefix)
+    // On Unix, CMake produces libXXX.a files
+    let link_lib = |name: &str| {
+        println!("cargo:rustc-link-lib=static={}", name);
+    };
+
     // 1. Plugins (depend on gvc, layout engines, core libs)
-    println!("cargo:rustc-link-lib=static=gvplugin_neato_layout");
-    println!("cargo:rustc-link-lib=static=gvplugin_dot_layout");
-    println!("cargo:rustc-link-lib=static=gvplugin_core");
+    link_lib("gvplugin_neato_layout");
+    link_lib("gvplugin_dot_layout");
+    link_lib("gvplugin_core");
 
     // 2. GVC (depends on cgraph, common, plugins infrastructure)
-    println!("cargo:rustc-link-lib=static=gvc");
+    link_lib("gvc");
 
     // 3. Layout engines (depend on common, cgraph, pathplan, etc.)
-    println!("cargo:rustc-link-lib=static=osage");
-    println!("cargo:rustc-link-lib=static=circogen");
-    println!("cargo:rustc-link-lib=static=patchwork");
-    println!("cargo:rustc-link-lib=static=twopigen");
-    println!("cargo:rustc-link-lib=static=sfdpgen");
-    println!("cargo:rustc-link-lib=static=fdpgen");
-    println!("cargo:rustc-link-lib=static=neatogen");
-    println!("cargo:rustc-link-lib=static=dotgen");
+    link_lib("osage");
+    link_lib("circogen");
+    link_lib("patchwork");
+    link_lib("twopigen");
+    link_lib("sfdpgen");
+    link_lib("fdpgen");
+    link_lib("neatogen");
+    link_lib("dotgen");
 
     // 4. Mid-level libraries (depend on cgraph, cdt, etc.)
-    println!("cargo:rustc-link-lib=static=expr");
-    println!("cargo:rustc-link-lib=static=sparse");
-    println!("cargo:rustc-link-lib=static=rbtree");
-    println!("cargo:rustc-link-lib=static=ortho");
-    println!("cargo:rustc-link-lib=static=pack");
-    println!("cargo:rustc-link-lib=static=label");
-    println!("cargo:rustc-link-lib=static=common");
-    println!("cargo:rustc-link-lib=static=xdot");
-    println!("cargo:rustc-link-lib=static=pathplan");
-    println!("cargo:rustc-link-lib=static=cgraph");
-    println!("cargo:rustc-link-lib=static=cdt");
+    link_lib("expr");
+    link_lib("sparse");
+    link_lib("rbtree");
+    link_lib("ortho");
+    link_lib("pack");
+    link_lib("label");
+    link_lib("common");
+    link_lib("xdot");
+    link_lib("pathplan");
+    link_lib("cgraph");
+    link_lib("cdt");
 
     // 5. Low-level utility libraries
-    println!("cargo:rustc-link-lib=static=sfio");
-    println!("cargo:rustc-link-lib=static=ast");
-    println!("cargo:rustc-link-lib=static=util");
+    link_lib("sfio");
+    link_lib("ast");
+    link_lib("util");
 
     // 6. External dependencies (lowest level)
     // Expat library name differs on Windows with static CRT
