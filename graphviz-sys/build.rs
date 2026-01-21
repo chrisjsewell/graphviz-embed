@@ -686,11 +686,12 @@ fn emit_link_search_debug(base_path: &Path, components: &[&str], target_os: &str
 
 /// Debug helper to list what library files exist in a directory
 /// Takes path components as a slice to avoid forward-slash issues on Windows
-fn debug_list_libs(base_path: &Path, components: &[&str], label: &str) {
+fn debug_list_libs(base_path: &Path, components: &[&str]) {
     let mut dir = base_path.to_path_buf();
     for component in components {
         dir = dir.join(component);
     }
+    let label = components.join("/");
     println!("cargo:warning=Checking {}: {}", label, dir.display());
     if dir.exists() {
         if let Ok(entries) = fs::read_dir(&dir) {
@@ -709,57 +710,21 @@ fn debug_list_libs(base_path: &Path, components: &[&str], label: &str) {
 
 fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os: &str) {
     // Debug: List what libraries exist in Graphviz directories
-    debug_list_libs(graphviz_install, &["lib"], "graphviz install/lib");
-    debug_list_libs(graphviz_install, &["build", "lib", "gvc"], "build/lib/gvc");
-    debug_list_libs(
-        graphviz_install,
-        &["build", "lib", "gvc", "Release"],
-        "build/lib/gvc/Release",
-    );
-    debug_list_libs(
-        graphviz_install,
-        &["build", "lib", "gvc", "Debug"],
-        "build/lib/gvc/Debug",
-    );
-    debug_list_libs(
-        graphviz_install,
-        &["build", "lib", "cgraph"],
-        "build/lib/cgraph",
-    );
-    debug_list_libs(
-        graphviz_install,
-        &["build", "lib", "cgraph", "Release"],
-        "build/lib/cgraph/Release",
-    );
-    debug_list_libs(
-        graphviz_install,
-        &["build", "lib", "cgraph", "Debug"],
-        "build/lib/cgraph/Debug",
-    );
-    debug_list_libs(
-        graphviz_install,
-        &["build", "plugin", "core"],
-        "build/plugin/core",
-    );
-    debug_list_libs(
-        graphviz_install,
-        &["build", "plugin", "core", "Release"],
-        "build/plugin/core/Release",
-    );
-    debug_list_libs(
-        graphviz_install,
-        &["build", "plugin", "core", "Debug"],
-        "build/plugin/core/Debug",
-    );
+    debug_list_libs(graphviz_install, &["lib"]);
+    debug_list_libs(graphviz_install, &["build", "lib", "gvc"]);
+    debug_list_libs(graphviz_install, &["build", "lib", "gvc", "Release"]);
+    debug_list_libs(graphviz_install, &["build", "lib", "gvc", "Debug"]);
+    debug_list_libs(graphviz_install, &["build", "lib", "cgraph"]);
+    debug_list_libs(graphviz_install, &["build", "lib", "cgraph", "Release"]);
+    debug_list_libs(graphviz_install, &["build", "lib", "cgraph", "Debug"]);
+    debug_list_libs(graphviz_install, &["build", "plugin", "core"]);
+    debug_list_libs(graphviz_install, &["build", "plugin", "core", "Release"]);
+    debug_list_libs(graphviz_install, &["build", "plugin", "core", "Debug"]);
 
     // Debug: List what libraries exist in Expat directories
-    debug_list_libs(expat_install, &["lib"], "expat install/lib");
-    debug_list_libs(expat_install, &["lib", "Debug"], "expat install/lib/Debug");
-    debug_list_libs(
-        expat_install,
-        &["lib", "Release"],
-        "expat install/lib/Release",
-    );
+    debug_list_libs(expat_install, &["lib"]);
+    debug_list_libs(expat_install, &["lib", "Debug"]);
+    debug_list_libs(expat_install, &["lib", "Release"]);
 
     // Add library search paths
     // The main install directory
