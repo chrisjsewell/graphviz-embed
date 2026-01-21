@@ -1,13 +1,14 @@
 # graphviz-embed
 
-**Embedded Graphviz library for Rust** — render DOT graphs without external dependencies.
+**Embedded Graphviz library for Rust and Python** — render DOT graphs without external dependencies.
 
 [![Crates.io](https://img.shields.io/crates/v/graphviz-embed.svg)](https://crates.io/crates/graphviz-embed)
 [![Documentation](https://docs.rs/graphviz-embed/badge.svg)](https://docs.rs/graphviz-embed)
+[![PyPI](https://img.shields.io/pypi/v/graphviz-embed.svg)](https://pypi.org/project/graphviz-embed/)
 [![CI](https://github.com/chrisjsewell/graphviz-embed/workflows/CI/badge.svg)](https://github.com/chrisjsewell/graphviz-embed/actions)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-This crate provides a safe Rust API to render DOT graphs using a fully embedded Graphviz library. No external tools or system Graphviz installation required.
+This project provides a safe Rust API and Python bindings to render DOT graphs using a fully embedded Graphviz library. No external tools or system Graphviz installation required.
 
 ## Features
 
@@ -59,11 +60,21 @@ RUSTFLAGS='-C target-feature=+crt-static' cargo build --release
 
 ## Installation
 
+### Rust
+
 Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 graphviz-embed = "0.1"
+```
+
+### Python
+
+Install via pip:
+
+```bash
+pip install graphviz-embed
 ```
 
 For PNG/PDF output, enable the `cairo` feature:
@@ -94,6 +105,8 @@ This happens automatically via Cargo's build script system. The initial build ta
 
 ## Quick Start
 
+### Rust
+
 ```rust
 use graphviz_embed::{GraphvizContext, Layout, Format};
 
@@ -118,6 +131,30 @@ fn main() -> Result<(), graphviz_embed::Error> {
 
     Ok(())
 }
+```
+
+### Python
+
+```python
+from graphviz_embed import GraphvizContext
+
+# Create a Graphviz context
+ctx = GraphvizContext()
+
+# Define your graph in DOT language
+dot_source = """
+    digraph G {
+        rankdir=LR;
+        a [label="Start"];
+        b [label="Process"];
+        c [label="End"];
+        a -> b -> c;
+    }
+"""
+
+# Render to SVG
+svg = ctx.render(dot_source, "dot", "svg")
+print(svg.decode('utf-8'))
 ```
 
 ## Layout Engines
@@ -388,7 +425,7 @@ When cross-compiling (e.g., building Linux ARM64 from x86_64):
 
 ### Medium Term
 
-- [ ] Add Python bindings via PyO3 and Maturin
+- [x] Add Python bindings via PyO3 and Maturin
 - [ ] Add WebAssembly (WASM) support for browser-based rendering
 - [ ] Implement graph builder API for programmatic graph construction
 - [ ] Add async rendering support

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "graphviz-embed"
+version = "0.1.0"
+description = "Embedded Graphviz library for Python - render DOT graphs without external dependencies"
+authors = [
+    { name = "Chris Sewell", email = "chrisj_sewell@hotmail.com" }
+]
+readme = "README.md"
+license = { text = "MIT OR Apache-2.0" }
+requires-python = ">=3.8"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Multimedia :: Graphics",
+]
+keywords = ["graphviz", "graph", "visualization", "dot", "svg"]
+
+[project.urls]
+Homepage = "https://github.com/chrisjsewell/graphviz-embed"
+Repository = "https://github.com/chrisjsewell/graphviz-embed"
+Documentation = "https://github.com/chrisjsewell/graphviz-embed#readme"
+
+[tool.maturin]
+features = ["pyo3/extension-module"]
+python-source = "python"
+module-name = "graphviz_embed._graphviz_py"
