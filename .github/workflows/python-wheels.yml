@@ -71,7 +71,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       
       - name: Download wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.8
         with:
           name: wheels-${{ matrix.os }}
           path: dist
@@ -96,7 +96,7 @@ jobs:
     
     steps:
       - name: Download all wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v4.1.8
         with:
           pattern: wheels-*
           path: dist
