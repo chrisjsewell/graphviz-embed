@@ -445,10 +445,6 @@ fn build_expat(
     if target.contains("msvc") {
         let use_static_crt = is_static_crt();
         let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
-        println!(
-            "cargo:warning=MSVC CRT: static={}, flag={}",
-            use_static_crt, crt_flag
-        );
 
         // Force Release build type. This is critical because:
         // 1. Rust always uses release CRT, so we must match with Release config
@@ -525,7 +521,6 @@ fn build_graphviz(
         // NOTE: Rust ALWAYS uses release CRT (/MT or /MD), even in debug builds.
         // The debug CRT variants (/MTd, /MDd) are never used by Rust's standard library.
         let crt_flag = if use_static_crt { "/MT" } else { "/MD" };
-        println!("cargo:warning=Setting MSVC CRT flag: {}", crt_flag);
 
         // Force Release build type to match Rust's release CRT
         config.profile("Release");
@@ -664,79 +659,66 @@ fn emit_link_search(base_path: &Path, components: &[&str], target_os: &str) {
     }
 }
 
-/// Emit link search path with debug output
-fn emit_link_search_debug(base_path: &Path, components: &[&str], target_os: &str) {
-    let mut path = base_path.to_path_buf();
-    for component in components {
-        path = path.join(component);
-    }
-    let label = components.join("/");
-    println!("cargo:warning=Link search [{}]: {}", label, path.display());
-    println!("cargo:rustc-link-search=native={}", path.display());
-
-    if target_os == "windows" {
-        let release_path = path.join("Release");
-        println!(
-            "cargo:warning=Link search [{}/Release]: {}",
-            label,
-            release_path.display()
-        );
-        println!("cargo:rustc-link-search=native={}", release_path.display());
-    }
-}
-
-/// Debug helper to list what library files exist in a directory
-/// Takes path components as a slice to avoid forward-slash issues on Windows
-fn debug_list_libs(base_path: &Path, components: &[&str]) {
-    let mut dir = base_path.to_path_buf();
-    for component in components {
-        dir = dir.join(component);
-    }
-    let label = components.join("/");
-    println!("cargo:warning=Checking {}: {}", label, dir.display());
-    if dir.exists() {
-        if let Ok(entries) = fs::read_dir(&dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                let name = path.file_name().unwrap_or_default().to_string_lossy();
-                if name.ends_with(".lib") || name.ends_with(".a") {
-                    println!("cargo:warning=  Found: {}", name);
-                }
-            }
-        }
-    } else {
-        println!("cargo:warning=  Directory does not exist!");
-    }
-}
+// Debug helper functions - uncomment when troubleshooting linking issues
+//
+// /// Emit link search path with debug output
+// #[allow(dead_code)]
+// fn emit_link_search_debug(base_path: &Path, components: &[&str], target_os: &str) {
+//     let mut path = base_path.to_path_buf();
+//     for component in components {
+//         path = path.join(component);
+//     }
+//     let label = components.join("/");
+//     println!("cargo:warning=Link search [{}]: {}", label, path.display());
+//     println!("cargo:rustc-link-search=native={}", path.display());
+//
+//     if target_os == "windows" {
+//         let release_path = path.join("Release");
+//         println!(
+//             "cargo:warning=Link search [{}/Release]: {}",
+//             label,
+//             release_path.display()
+//         );
+//         println!("cargo:rustc-link-search=native={}", release_path.display());
+//     }
+// }
+//
+// /// Debug helper to list what library files exist in a directory
+// /// Takes path components as a slice to avoid forward-slash issues on Windows
+// #[allow(dead_code)]
+// fn debug_list_libs(base_path: &Path, components: &[&str]) {
+//     let mut dir = base_path.to_path_buf();
+//     for component in components {
+//         dir = dir.join(component);
+//     }
+//     let label = components.join("/");
+//     println!("cargo:warning=Checking {}: {}", label, dir.display());
+//     if dir.exists() {
+//         if let Ok(entries) = fs::read_dir(&dir) {
+//             for entry in entries.flatten() {
+//                 let path = entry.path();
+//                 let name = path.file_name().unwrap_or_default().to_string_lossy();
+//                 if name.ends_with(".lib") || name.ends_with(".a") {
+//                     println!("cargo:warning=  Found: {}", name);
+//                 }
+//             }
+//         }
+//     } else {
+//         println!("cargo:warning=  Directory does not exist!");
+//     }
+// }
 
 fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os: &str) {
-    // Debug: List what libraries exist in Graphviz directories
-    debug_list_libs(graphviz_install, &["lib"]);
-    debug_list_libs(graphviz_install, &["build", "lib", "gvc"]);
-    debug_list_libs(graphviz_install, &["build", "lib", "gvc", "Release"]);
-    debug_list_libs(graphviz_install, &["build", "lib", "gvc", "Debug"]);
-    debug_list_libs(graphviz_install, &["build", "lib", "cgraph"]);
-    debug_list_libs(graphviz_install, &["build", "lib", "cgraph", "Release"]);
-    debug_list_libs(graphviz_install, &["build", "lib", "cgraph", "Debug"]);
-    debug_list_libs(graphviz_install, &["build", "plugin", "core"]);
-    debug_list_libs(graphviz_install, &["build", "plugin", "core", "Release"]);
-    debug_list_libs(graphviz_install, &["build", "plugin", "core", "Debug"]);
-
-    // Debug: List what libraries exist in Expat directories
-    debug_list_libs(expat_install, &["lib"]);
-    debug_list_libs(expat_install, &["lib", "Debug"]);
-    debug_list_libs(expat_install, &["lib", "Release"]);
-
     // Add library search paths
     // The main install directory
-    emit_link_search_debug(graphviz_install, &["lib"], target_os);
+    emit_link_search(graphviz_install, &["lib"], target_os);
     emit_link_search(graphviz_install, &["lib64"], target_os);
 
     // Plugins are built in the build directory, not installed
     let build_dir = graphviz_install.join("build");
-    emit_link_search_debug(&build_dir, &["plugin", "dot_layout"], target_os);
-    emit_link_search_debug(&build_dir, &["plugin", "neato_layout"], target_os);
-    emit_link_search_debug(&build_dir, &["plugin", "core"], target_os);
+    emit_link_search(&build_dir, &["plugin", "dot_layout"], target_os);
+    emit_link_search(&build_dir, &["plugin", "neato_layout"], target_os);
+    emit_link_search(&build_dir, &["plugin", "core"], target_os);
     emit_link_search(&build_dir, &["plugin", "pango"], target_os);
     emit_link_search(&build_dir, &["plugin", "quartz"], target_os);
     emit_link_search(&build_dir, &["plugin", "kitty"], target_os);
@@ -762,15 +744,15 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     emit_link_search(&build_dir, &["lib", "ast"], target_os);
     emit_link_search(&build_dir, &["lib", "expr"], target_os);
     emit_link_search(&build_dir, &["lib", "util"], target_os);
-    // Core libraries - use debug versions for key paths
-    emit_link_search_debug(&build_dir, &["lib", "cgraph"], target_os);
+    // Core libraries
+    emit_link_search(&build_dir, &["lib", "cgraph"], target_os);
     emit_link_search(&build_dir, &["lib", "cdt"], target_os);
-    emit_link_search_debug(&build_dir, &["lib", "gvc"], target_os);
+    emit_link_search(&build_dir, &["lib", "gvc"], target_os);
     emit_link_search(&build_dir, &["lib", "pathplan"], target_os);
     emit_link_search(&build_dir, &["lib", "xdot"], target_os);
 
     // Expat directories
-    emit_link_search_debug(expat_install, &["lib"], target_os);
+    emit_link_search(expat_install, &["lib"], target_os);
     emit_link_search(expat_install, &["lib64"], target_os);
 
     // Link Graphviz libraries
@@ -842,11 +824,6 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
         "windows" => {
             let crt_suffix = if is_static_crt() { "MT" } else { "MD" };
             let expat_lib = format!("libexpat{}.lib", crt_suffix);
-            println!(
-                "cargo:warning=Using expat library: {} (static_crt={})",
-                expat_lib,
-                is_static_crt()
-            );
             println!("cargo:rustc-link-lib=static:+verbatim={}", expat_lib);
         }
         _ => println!("cargo:rustc-link-lib=static=expat"),
