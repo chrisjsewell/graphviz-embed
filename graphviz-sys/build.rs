@@ -814,8 +814,17 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // Helper to link a library with platform-appropriate naming
     // On Windows MSVC, CMake produces XXX.lib files (no lib prefix)
     // On Unix, CMake produces libXXX.a files
+    //
+    // We use -bundle to prevent bundling into the rlib, instead letting the linker
+    // find them at final link time. This is more reliable on Windows where library
+    // bundling can fail silently.
     let link_lib = |name: &str| {
-        println!("cargo:rustc-link-lib=static={}", name);
+        // Use -bundle on Windows to defer linking to final link step
+        if target_os == "windows" {
+            println!("cargo:rustc-link-lib=static:-bundle={}", name);
+        } else {
+            println!("cargo:rustc-link-lib=static={}", name);
+        }
     };
 
     // 1. Plugins (depend on gvc, layout engines, core libs)
