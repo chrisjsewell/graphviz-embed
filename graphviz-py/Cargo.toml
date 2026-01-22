@@ -1,0 +1,25 @@
+[package]
+name = "graphviz-py"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors = ["Chris Sewell <chrisj_sewell@hotmail.com>"]
+description = "Python bindings for graphviz-embed: render DOT graphs without external dependencies"
+keywords = ["graphviz", "graph", "visualization", "python", "pyo3"]
+categories = ["api-bindings", "graphics", "visualization"]
+
+[lib]
+name = "graphviz_py"
+crate-type = ["cdylib"]
+
+[dependencies]
+graphviz-sys = { path = "../graphviz-sys", features = ["cdylib"] }
+graphviz-embed = { path = "../graphviz-embed" }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+
+[build-dependencies]
+pyo3-build-config = "0.22"
+
+[features]
+cairo = ["graphviz-embed/cairo"]

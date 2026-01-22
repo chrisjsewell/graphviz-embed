@@ -119,6 +119,10 @@ fn main() {
     #[cfg(feature = "cairo")]
     handle_cairo_feature(&target_os);
 
+    // Export OUT_DIR for downstream crates (e.g., Python bindings)
+    // This allows them to find the built libraries for whole-archive linking
+    println!("cargo:out-dir={}", out_dir.display());
+
     // Rerun if sources change
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed={}", graphviz_src.display());
@@ -823,6 +827,15 @@ fn emit_link_directives(graphviz_install: &Path, expat_install: &Path, target_os
     // We use -bundle to prevent bundling into the rlib, instead letting the linker
     // find them at final link time. This is more reliable on Windows where library
     // bundling can fail silently.
+    //
+    // For cdylib builds (Python extensions), we use normal static linking but with
+    // --allow-multiple-definition to handle any duplicates.
+    let is_cdylib = cfg!(feature = "cdylib");
+    
+    if is_cdylib {
+        eprintln!("graphviz-sys: Building with cdylib feature");
+    }
+    
     let link_lib = |name: &str| {
         // Use -bundle on Windows to defer linking to final link step
         if target_os == "windows" {
