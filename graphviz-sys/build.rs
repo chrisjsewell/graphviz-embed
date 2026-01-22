@@ -24,7 +24,7 @@ fn main() {
     // Standalone: sources are in ./vendor/, ./generated/, ./patches/ within the crate
     let (graphviz_src, expat_src, generated_dir, patches_dir) = {
         let workspace_dir = manifest_dir.parent();
-        
+
         // Check if we're in a workspace with sources at the workspace level
         if let Some(ws) = workspace_dir {
             let ws_graphviz = ws.join("vendor").join("graphviz");
@@ -233,7 +233,10 @@ fn apply_patches(_patches_dir: &Path, graphviz_src: &Path) {
     }
 
     // Patch cgraph/CMakeLists.txt
-    let cgraph_cmake = graphviz_src.join("lib").join("cgraph").join("CMakeLists.txt");
+    let cgraph_cmake = graphviz_src
+        .join("lib")
+        .join("cgraph")
+        .join("CMakeLists.txt");
     if cgraph_cmake.exists() {
         let content = fs::read_to_string(&cgraph_cmake).unwrap();
         let patched = patch_cgraph_cmake(&content);
@@ -241,7 +244,10 @@ fn apply_patches(_patches_dir: &Path, graphviz_src: &Path) {
     }
 
     // Patch common/CMakeLists.txt
-    let common_cmake = graphviz_src.join("lib").join("common").join("CMakeLists.txt");
+    let common_cmake = graphviz_src
+        .join("lib")
+        .join("common")
+        .join("CMakeLists.txt");
     if common_cmake.exists() {
         let content = fs::read_to_string(&common_cmake).unwrap();
         let patched = patch_common_cmake(&content);
