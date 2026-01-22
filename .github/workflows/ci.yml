@@ -172,7 +172,9 @@ jobs:
         if: runner.os == 'Windows'
         uses: lukka/run-vcpkg@v11
         with:
-          vcpkgGitCommitId: 'a34c873a9717a888f58dc05571dde15c66c4f682'
+          # https://github.com/microsoft/vcpkg/releases/tag/2026.01.16
+          # https://github.com/microsoft/vcpkg/commit/66c0373dc7fca549e5803087b9487edfe3aca0a1
+          vcpkgGitCommitId: '66c0373dc7fca549e5803087b9487edfe3aca0a1'
           vcpkgJsonGlob: 'vcpkg.json'
 
       - name: Install Cairo via vcpkg (Windows)
