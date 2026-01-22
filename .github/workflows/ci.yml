@@ -176,11 +176,9 @@ jobs:
           # https://github.com/microsoft/vcpkg/commit/66c0373dc7fca549e5803087b9487edfe3aca0a1
           vcpkgGitCommitId: '66c0373dc7fca549e5803087b9487edfe3aca0a1'
           vcpkgJsonGlob: 'vcpkg.json'
-
-      - name: Install Cairo via vcpkg (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          vcpkg install cairo pango --triplet x64-windows-static
+          runVcpkgInstall: true
+        env:
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
 
       # Cache Rust dependencies
       - name: Cache Rust
